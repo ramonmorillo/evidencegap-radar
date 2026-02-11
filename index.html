@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <link rel="stylesheet" href="styles.css" />
-  <!-- FIX: evita el 404 de favicon.ico -->
+  <!-- Evita el 404 de favicon.ico -->
   <link rel="icon" href="data:," />
 </head>
 
@@ -17,37 +17,31 @@
   </header>
 
   <section class="card">
-
     <h2>PICO-lite</h2>
 
     <div class="form-grid">
-
       <div class="form-group">
         <label for="population">Población</label>
-        <input id="population" type="text" placeholder="Ej: HIV, outpatients, older adults" />
+        <input id="population" type="text" placeholder="Ej: VIH, outpatients, older adults" />
       </div>
 
-      <div class="form-group suggest-box">
+      <div class="form-group">
         <label for="intervention">Intervención / Exposición</label>
-        <input id="intervention" type="text" placeholder="Ej: telepharmacy, motivational interviewing" autocomplete="off"/>
-        <div id="intervention-suggest" class="suggestions"></div>
+        <input id="intervention" type="text" placeholder="Ej: telepharmacy, motivational interviewing" />
       </div>
 
-      <div class="form-group suggest-box">
+      <div class="form-group">
         <label for="outcome">Outcome</label>
-        <input id="outcome" type="text" placeholder="Ej: adherence, PROMs, safety" autocomplete="off"/>
-        <div id="outcome-suggest" class="suggestions"></div>
+        <input id="outcome" type="text" placeholder="Ej: adherence, PROMs, safety" />
       </div>
 
       <div class="form-group">
         <label for="context">Contexto (opcional)</label>
         <input id="context" type="text" placeholder="Ej: hospital, outpatient clinic" />
       </div>
-
     </div>
 
     <div class="actions">
-
       <select id="window">
         <option value="7">7 días</option>
         <option value="30">30 días</option>
@@ -56,25 +50,23 @@
       </select>
 
       <button id="analyze">Analizar</button>
+      <button id="reset" class="secondary">Reiniciar</button>
       <button id="print" class="secondary">Imprimir / Guardar PDF</button>
-
     </div>
 
+    <!-- Aquí mostraremos errores reales (no alert genérico) -->
+    <div id="errorBox" class="error-box hidden"></div>
   </section>
 
-  <!-- Caja explicativa -->
   <div class="info-box">
     <h3>¿Qué es EvidenceGap Radar?</h3>
     <p>
-      EvidenceGap Radar es una herramienta exploratoria diseñada para ofrecer una visión rápida del
-      panorama de evidencia científica a partir de una pregunta tipo PICO-lite.
-    </p>
-    <p>
-      Integra señales procedentes de PubMed y ClinicalTrials.gov para identificar posibles brechas de evidencia,
-      áreas emergentes o campos saturados.
+      Herramienta exploratoria para obtener, en 1 minuto, una fotografía del “paisaje de evidencia”
+      de una pregunta tipo PICO-lite. Combina señales de PubMed y ClinicalTrials.gov para orientar
+      hipótesis, brechas y oportunidades de investigación.
     </p>
     <p class="muted">
-      Orienta la reflexión clínica e investigadora. No sustituye la lectura crítica ni la evaluación metodológica detallada.
+      No sustituye la lectura crítica ni la evaluación metodológica.
     </p>
   </div>
 
@@ -83,11 +75,10 @@
     <div id="report"></div>
   </section>
 
-  <footer style="text-align:center; margin:30px 0; color:rgba(255,255,255,0.4); font-size:13px;">
+  <footer style="text-align:center; margin:30px 0; color:rgba(255,255,255,0.45); font-size:13px;">
     Creado por Ramón Morillo · Febrero 2026
   </footer>
 
   <script type="module" src="js/app.js"></script>
-
 </body>
 </html>

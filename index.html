@@ -5,8 +5,8 @@
   <title>EvidenceGap Radar</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link rel="stylesheet" href="styles.css" />
-  <!-- Evita el 404 de favicon.ico -->
+  <!-- cache-busting -->
+  <link rel="stylesheet" href="styles.css?v=20260211_1" />
   <link rel="icon" href="data:," />
 </head>
 
@@ -54,20 +54,16 @@
       <button id="print" class="secondary">Imprimir / Guardar PDF</button>
     </div>
 
-    <!-- Aquí mostraremos errores reales (no alert genérico) -->
     <div id="errorBox" class="error-box hidden"></div>
   </section>
 
   <div class="info-box">
     <h3>¿Qué es EvidenceGap Radar?</h3>
     <p>
-      Herramienta exploratoria para obtener, en 1 minuto, una fotografía del “paisaje de evidencia”
-      de una pregunta tipo PICO-lite. Combina señales de PubMed y ClinicalTrials.gov para orientar
-      hipótesis, brechas y oportunidades de investigación.
+      Herramienta exploratoria para obtener una fotografía del “paisaje de evidencia” de una pregunta PICO-lite
+      combinando señales de PubMed y ClinicalTrials.gov.
     </p>
-    <p class="muted">
-      No sustituye la lectura crítica ni la evaluación metodológica.
-    </p>
+    <p class="muted">No sustituye la lectura crítica ni la evaluación metodológica.</p>
   </div>
 
   <section id="results" class="card hidden">
@@ -79,6 +75,7 @@
     Creado por Ramón Morillo · Febrero 2026
   </footer>
 
-  <script type="module" src="js/app.js"></script>
+  <!-- cache-busting -->
+  <script type="module" src="js/app.js?v=20260211_1"></script>
 </body>
 </html>

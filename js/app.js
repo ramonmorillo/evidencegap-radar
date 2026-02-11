@@ -1,137 +1,183 @@
-import { buildPubMedTerm, pubmedESearch, pubmedESummary } from "./pubmed.js";
-import { ctgovSearch, summarizeTrials } from "./ctgov.js";
-import { classifyEvidence, generateOpportunities } from "./rules.js";
-import { renderResults, renderBrief } from "./report.js";
+import { getJson } from "./api.js";
+import { renderResults } from "./report.js";
 
 document.addEventListener("DOMContentLoaded", () => {
+  const $ = (id) => document.getElementById(id);
 
-  document.getElementById("analyze")?.addEventListener("click", analyze);
+  const population = $("population");
+  const intervention = $("intervention");
+  const outcome = $("outcome");
+  const context = $("context");
+  const windowSel = $("window");
 
-  document.getElementById("print")?.addEventListener("click", () => {
-    window.print();
-  });
+  const btnAnalyze = $("analyze");
+  const btnReset = $("reset");
+  const btnPrint = $("print");
 
-  setupMeshAutocomplete("intervention", "intervention-suggest");
-  setupMeshAutocomplete("outcome", "outcome-suggest");
+  const results = $("results");
+  const report = $("report");
+  const errorBox = $("errorBox");
 
-});
-
-async function analyze() {
-
-  const population = document.getElementById("population").value;
-  const intervention = document.getElementById("intervention").value;
-  const outcome = document.getElementById("outcome").value;
-  const context = document.getElementById("context").value;
-  const windowDays = document.getElementById("window").value;
-
-  const query = {
-    title: `Evidence gap: ${population} / ${intervention} / ${outcome}`,
-    population,
-    intervention,
-    outcome,
-    context
-  };
-
-  const term = buildPubMedTerm(query);
-
-  const analyzeBtn = document.getElementById("analyze");
-
-  try {
-    analyzeBtn.textContent = "Analizando...";
-    analyzeBtn.disabled = true;
-
-    const pubmedRecent = await pubmedESearch(term, windowDays);
-    const pubRecent = Number(pubmedRecent?.esearchresult?.count || 0);
-    const ids = pubmedRecent?.esearchresult?.idlist || [];
-
-    const pubmed10y = await pubmedESearch(term, "3650");
-    const pub10y = Number(pubmed10y?.esearchresult?.count || 0);
-
-    const summary = await pubmedESummary(ids.slice(0, 5));
-
-    const ctgovRaw = await ctgovSearch(term);
-    const trials = summarizeTrials(ctgovRaw);
-
-    const evidenceClass = classifyEvidence({
-      pubCount10y: pub10y,
-      pubCountRecent: pubRecent,
-      trialsSummary: trials
-    });
-
-    const opps = generateOpportunities({
-      pubCount10y: pub10y,
-      pubCountRecent: pubRecent,
-      trialsSummary: trials
-    });
-
-    document.getElementById("report").innerHTML =
-      renderResults({
-        query,
-        pub10y,
-        pubRecent: pubRecent,
-        trials,
-        evidenceClass,
-        opps,
-        topPubs: summary?.result ? Object.values(summary.result) : []
-      });
-
-    document.getElementById("results").classList.remove("hidden");
-
-  } catch (err) {
-    console.error(err);
-    alert("Error durante el análisis");
-
-  } finally {
-    analyzeBtn.textContent = "Analizar";
-    analyzeBtn.disabled = false;
+  // Si algo no existe, paramos con un error claro (en vez de romper con addEventListener null)
+  const required = [
+    population, intervention, outcome, context,
+    windowSel, btnAnalyze, btnReset, btnPrint,
+    results, report, errorBox
+  ];
+  if (required.some(x => !x)) {
+    alert("Falta algún elemento en index.html (IDs no coinciden). Revisa que hayas pegado el index completo.");
+    return;
   }
-}
 
-/* ------------------ MeSH AUTOCOMPLETE ------------------ */
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove("hidden");
+  }
 
-function setupMeshAutocomplete(inputId, suggestId) {
-  const input = document.getElementById(inputId);
-  const box = document.getElementById(suggestId);
+  function clearError() {
+    errorBox.textContent = "";
+    errorBox.classList.add("hidden");
+  }
 
-  if (!input || !box) return;
+  function buildTerm({ population, intervention, outcome, context }) {
+    const parts = [population, intervention, outcome, context]
+      .map(x => (x || "").trim())
+      .filter(Boolean)
+      .map(x => `(${x})`);
+    return parts.join(" AND ");
+  }
 
-  input.addEventListener("input", async () => {
-    const q = input.value.trim();
-
-    if (q.length < 3) {
-      box.innerHTML = "";
-      return;
+  function classifyEvidence(pubRecent, pub10y, trialN) {
+    // Heurística simple y transparente (se puede refinar después)
+    if (pub10y <= 10 && trialN === 0) {
+      return { label: "Huérfano", rationale: "Muy poca evidencia publicada y sin señales de ensayos." };
     }
+    if (pubRecent <= 5 && trialN <= 1) {
+      return { label: "Emergente", rationale: "Pocas señales recientes; posible nicho o evidencia incipiente." };
+    }
+    if (pubRecent >= 50 && pub10y >= 500) {
+      return { label: "Saturado", rationale: "Muchísima publicación; conviene afinar a subpreguntas o outcomes específicos." };
+    }
+    if (trialN > 0) {
+      return { label: "Maduro (activo)", rationale: "Hay ensayos registrados; existe actividad de investigación en curso." };
+    }
+    return { label: "Moderado", rationale: "Evidencia intermedia. Buen terreno para revisar brechas y comparabilidad." };
+  }
+
+  function suggestOpps(pubRecent, trialN) {
+    const opps = [];
+    if (trialN > 0) opps.push("Hay ensayos activos: mapear outcomes, comparabilidad y brechas.");
+    if (pubRecent === 0) opps.push("Sin señales recientes: probar sinónimos/MeSH o reformular términos.");
+    if (trialN === 0) opps.push("Sin ensayos: valorar piloto/factibilidad o estudios cualitativos/mixtos.");
+    if (!opps.length) opps.push("Refinar la pregunta: población más concreta, intervención y outcome medible.");
+    return opps;
+  }
+
+  function countBy(arr, fn) {
+    const out = {};
+    for (const x of (arr || [])) {
+      const k = fn(x) || "UNKNOWN";
+      out[k] = (out[k] || 0) + 1;
+    }
+    return out;
+  }
+
+  async function runAnalysis() {
+    clearError();
+    btnAnalyze.disabled = true;
+    btnAnalyze.textContent = "Analizando…";
 
     try {
-      const resp = await fetch(
-        `https://clinicaltables.nlm.nih.gov/api/mesh/v3/search?terms=${encodeURIComponent(q)}`
+      const query = {
+        title: "PICO-lite",
+        population: population.value,
+        intervention: intervention.value,
+        outcome: outcome.value,
+        context: context.value
+      };
+
+      const reldate = String(windowSel.value || "7");
+      const term = buildTerm(query);
+
+      // PubMed: ventana seleccionada (con muestra de IDs)
+      const esRecent = await getJson(
+        `/api/pubmed/esearch?term=${encodeURIComponent(term)}&reldate=${encodeURIComponent(reldate)}&retmax=10`
+      );
+      const pubRecent = Number(esRecent?.esearchresult?.count || 0);
+      const idlist = esRecent?.esearchresult?.idlist || [];
+
+      let topPubs = [];
+      if (idlist.length) {
+        const esum = await getJson(`/api/pubmed/esummary?ids=${encodeURIComponent(idlist.join(","))}`);
+        const uids = esum?.result?.uids || [];
+        topPubs = uids.map(uid => esum.result[uid]).filter(Boolean);
+      }
+
+      // PubMed: 10 años aprox
+      const es10y = await getJson(
+        `/api/pubmed/esearch?term=${encodeURIComponent(term)}&reldate=3650&retmax=0`
+      );
+      const pub10y = Number(es10y?.esearchresult?.count || 0);
+
+      // ClinicalTrials
+      const ct = await getJson(
+        `/api/ctgov/search?query=${encodeURIComponent(term)}&pageSize=25`
       );
 
-      const data = await resp.json();
-      const suggestions = data[3] || [];
+      // Intentamos soportar varias formas de respuesta
+      const studies = ct?.studies || ct?.results || [];
+      const trialN = Number(ct?.total || ct?.totalCount || studies.length || 0);
 
-      box.innerHTML = suggestions
-        .slice(0, 5)
-        .map(term => `<div class="suggest-item">${term}</div>`)
-        .join("");
-
-      box.querySelectorAll(".suggest-item").forEach(el => {
-        el.addEventListener("click", () => {
-          input.value = el.textContent;
-          box.innerHTML = "";
-        });
+      const statusCounts = countBy(studies, (s) => {
+        const st = s?.protocolSection?.statusModule?.overallStatus;
+        return st || "UNKNOWN";
       });
 
-    } catch (e) {
-      console.warn("MeSH suggest fallback");
-      box.innerHTML = "";
-    }
-  });
+      const phaseCounts = countBy(studies, (s) => {
+        const ph = s?.protocolSection?.designModule?.phases;
+        if (Array.isArray(ph) && ph.length) return ph.join(",");
+        return "—";
+      });
 
-  document.addEventListener("click", (e) => {
-    if (!box.contains(e.target) && e.target !== input) {
-      box.innerHTML = "";
+      const evidenceClass = classifyEvidence(pubRecent, pub10y, trialN);
+      const opps = suggestOpps(pubRecent, trialN);
+
+      const html = renderResults({
+        query,
+        pub10y,
+        pubRecent,
+        trials: { n: trialN, statusCounts, phaseCounts },
+        evidenceClass,
+        opps,
+        topPubs
+      });
+
+      report.innerHTML = html;
+      results.classList.remove("hidden");
+
+    } catch (e) {
+      // Aquí ponemos el error REAL, no “Error durante el análisis”
+      showError(`Error real: ${e?.message || String(e)}`);
+
+    } finally {
+      btnAnalyze.disabled = false;
+      btnAnalyze.textContent = "Analizar";
     }
-  });
-}
+  }
+
+  function resetForm() {
+    clearError();
+    population.value = "";
+    intervention.value = "";
+    outcome.value = "";
+    context.value = "";
+    windowSel.value = "7";
+    report.innerHTML = "";
+    results.classList.add("hidden");
+    population.focus();
+  }
+
+  btnAnalyze.addEventListener("click", runAnalysis);
+  btnReset.addEventListener("click", resetForm);
+  btnPrint.addEventListener("click", () => window.print());
+});

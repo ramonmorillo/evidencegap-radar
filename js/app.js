@@ -1,13 +1,11 @@
-import { pubmedSearch, pubmedSummary } from "./pubmed.js";
+import { buildPubMedTerm, pubmedESearch, pubmedESummary } from "./pubmed.js";
 import { ctgovSearch } from "./ctgov.js";
 import { classifyEvidence } from "./rules.js";
 import { renderReport } from "./report.js";
 
-const analyzeBtn = document.getElementById("analyze");
-
 document.addEventListener("DOMContentLoaded", () => {
 
-  analyzeBtn?.addEventListener("click", analyze);
+  document.getElementById("analyze")?.addEventListener("click", analyze);
 
   document.getElementById("print")?.addEventListener("click", () => {
     window.print();
@@ -19,24 +17,26 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function analyze() {
+
   const population = document.getElementById("population").value;
   const intervention = document.getElementById("intervention").value;
   const outcome = document.getElementById("outcome").value;
   const context = document.getElementById("context").value;
   const windowDays = document.getElementById("window").value;
 
-  const term = [population, intervention, outcome, context]
-    .filter(Boolean)
-    .join(" ");
+  const query = { population, intervention, outcome, context };
+  const term = buildPubMedTerm(query);
+
+  const analyzeBtn = document.getElementById("analyze");
 
   try {
     analyzeBtn.textContent = "Analizando...";
     analyzeBtn.disabled = true;
 
-    const pubmed = await pubmedSearch(term, windowDays);
+    const pubmed = await pubmedESearch(term, windowDays);
     const ids = pubmed?.esearchresult?.idlist || [];
-    const summary = await pubmedSummary(ids.slice(0, 5));
 
+    const summary = await pubmedESummary(ids.slice(0, 5));
     const ctgov = await ctgovSearch(term);
 
     const classification = classifyEvidence(pubmed, ctgov);
@@ -71,6 +71,7 @@ function setupMeshAutocomplete(inputId, suggestId) {
 
   input.addEventListener("input", async () => {
     const q = input.value.trim();
+
     if (q.length < 3) {
       box.innerHTML = "";
       return;
@@ -80,8 +81,8 @@ function setupMeshAutocomplete(inputId, suggestId) {
       const resp = await fetch(
         `https://clinicaltables.nlm.nih.gov/api/mesh/v3/search?terms=${encodeURIComponent(q)}`
       );
-      const data = await resp.json();
 
+      const data = await resp.json();
       const suggestions = data[3] || [];
 
       box.innerHTML = suggestions

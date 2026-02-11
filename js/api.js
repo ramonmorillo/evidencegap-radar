@@ -1,33 +1,37 @@
-// ===============================
-// EvidenceGap Radar – API helper
-// ===============================
+// js/api.js
 
-// 👉 PEGA AQUÍ TU URL REAL DEL WORKER
-// (Cloudflare → Worker → "Visit")
-const WORKER_BASE = "https://TU-WORKER.workers.dev"; 
+// 👉 TU WORKER REAL
+const WORKER_BASE = "https://red-surf-9fd1.ramon-morillo-verdugo.workers.dev";
+
+function apiBase() {
+  const host = window.location.hostname;
+  const isGitHubPages = host.endsWith("github.io");
+
+  // En GitHub Pages → llama al Worker
+  // Si algún día sirves todo desde el mismo dominio → usará rutas relativas
+  return isGitHubPages ? WORKER_BASE : "";
+}
 
 export async function getJson(path) {
-  const url = path.startsWith("http")
-    ? path
-    : `${WORKER_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
+  const base = apiBase();
+  const url = (base ? base.replace(/\/$/, "") : "") + path;
 
   try {
     const resp = await fetch(url, {
       method: "GET",
-      headers: {
-        "Accept": "application/json"
-      }
+      credentials: "omit",
+      headers: { "Accept": "application/json" }
     });
 
     if (!resp.ok) {
       const text = await resp.text().catch(() => "");
-      throw new Error(`HTTP ${resp.status} ${resp.statusText}\n${text}`);
+      console.error("API ERROR →", url, resp.status, text);
+      throw new Error(`HTTP ${resp.status}`);
     }
 
     return await resp.json();
-
-  } catch (err) {
-    console.error("API ERROR →", url, err);
-    throw err;
+  } catch (e) {
+    console.error("API ERROR →", url, e);
+    throw e;
   }
 }

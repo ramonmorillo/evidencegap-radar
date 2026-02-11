@@ -1,7 +1,7 @@
 import { buildPubMedTerm, pubmedESearch, pubmedESummary } from "./pubmed.js";
-import { ctgovSearch } from "./ctgov.js";
-import { classifyEvidence } from "./rules.js";
-import { renderReport } from "./report.js";
+import { ctgovSearch, summarizeTrials } from "./ctgov.js";
+import { classifyEvidence, generateOpportunities } from "./rules.js";
+import { renderResults, renderBrief } from "./report.js";
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -24,7 +24,14 @@ async function analyze() {
   const context = document.getElementById("context").value;
   const windowDays = document.getElementById("window").value;
 
-  const query = { population, intervention, outcome, context };
+  const query = {
+    title: `Evidence gap: ${population} / ${intervention} / ${outcome}`,
+    population,
+    intervention,
+    outcome,
+    context
+  };
+
   const term = buildPubMedTerm(query);
 
   const analyzeBtn = document.getElementById("analyze");
@@ -33,21 +40,40 @@ async function analyze() {
     analyzeBtn.textContent = "Analizando...";
     analyzeBtn.disabled = true;
 
-    const pubmed = await pubmedESearch(term, windowDays);
-    const ids = pubmed?.esearchresult?.idlist || [];
+    const pubmedRecent = await pubmedESearch(term, windowDays);
+    const pubRecent = Number(pubmedRecent?.esearchresult?.count || 0);
+    const ids = pubmedRecent?.esearchresult?.idlist || [];
+
+    const pubmed10y = await pubmedESearch(term, "3650");
+    const pub10y = Number(pubmed10y?.esearchresult?.count || 0);
 
     const summary = await pubmedESummary(ids.slice(0, 5));
-    const ctgov = await ctgovSearch(term);
 
-    const classification = classifyEvidence(pubmed, ctgov);
+    const ctgovRaw = await ctgovSearch(term);
+    const trials = summarizeTrials(ctgovRaw);
 
-    renderReport({
-      term,
-      pubmed,
-      summary,
-      ctgov,
-      classification
+    const evidenceClass = classifyEvidence({
+      pubCount10y: pub10y,
+      pubCountRecent: pubRecent,
+      trialsSummary: trials
     });
+
+    const opps = generateOpportunities({
+      pubCount10y: pub10y,
+      pubCountRecent: pubRecent,
+      trialsSummary: trials
+    });
+
+    document.getElementById("report").innerHTML =
+      renderResults({
+        query,
+        pub10y,
+        pubRecent: pubRecent,
+        trials,
+        evidenceClass,
+        opps,
+        topPubs: summary?.result ? Object.values(summary.result) : []
+      });
 
     document.getElementById("results").classList.remove("hidden");
 

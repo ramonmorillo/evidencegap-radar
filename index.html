@@ -3,63 +3,73 @@
 <head>
   <meta charset="UTF-8" />
   <title>EvidenceGap Radar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- evita warning favicon -->
+  <link rel="icon" href="data:," />
 </head>
+
 <body>
 
-  <header class="header">
+  <header>
     <h1>EvidenceGap Radar</h1>
-    <p class="author">Creado por Ramón Morillo · Febrero 2026</p>
   </header>
 
-  <main class="container">
+  <section class="card">
 
-    <section class="card">
-      <h2>PICO-lite</h2>
+    <h2>PICO-lite</h2>
 
-      <div class="grid">
-        <div class="field">
-          <label>Población</label>
-          <input id="population" type="text" placeholder="Ej: pacientes VIH" />
-        </div>
+    <div class="form-grid">
 
-        <div class="field">
-          <label>Intervención / Exposición</label>
-          <input id="intervention" type="text" placeholder="Ej: telefarmacia" autocomplete="off"/>
-          <div id="intervention-suggest" class="suggestions"></div>
-        </div>
-
-        <div class="field">
-          <label>Outcome</label>
-          <input id="outcome" type="text" placeholder="Ej: adherencia" autocomplete="off"/>
-          <div id="outcome-suggest" class="suggestions"></div>
-        </div>
-
-        <div class="field">
-          <label>Contexto (opcional)</label>
-          <input id="context" type="text" placeholder="Ej: farmacia hospitalaria" />
-        </div>
+      <div class="form-group">
+        <label for="population">Población</label>
+        <input id="population" type="text" placeholder="Ej: HIV, outpatients, older adults" />
       </div>
 
-      <div class="actions">
-        <select id="window">
-          <option value="7">7 días</option>
-          <option value="30">30 días</option>
-          <option value="90">90 días</option>
-        </select>
-
-        <button id="analyze">Analizar</button>
-        <button id="print">Imprimir / Guardar PDF</button>
+      <div class="form-group suggest-box">
+        <label for="intervention">Intervención / Exposición</label>
+        <input id="intervention" type="text" placeholder="Ej: telepharmacy, motivational interviewing" autocomplete="off"/>
+        <div id="intervention-suggest" class="suggestions"></div>
       </div>
 
-    </section>
+      <div class="form-group suggest-box">
+        <label for="outcome">Outcome</label>
+        <input id="outcome" type="text" placeholder="Ej: adherence, PROMs, safety" autocomplete="off"/>
+        <div id="outcome-suggest" class="suggestions"></div>
+      </div>
 
-    <section id="results" class="card hidden">
-      <h2>Resultados</h2>
-      <div id="report"></div>
-    </section>
+      <div class="form-group">
+        <label for="context">Contexto (opcional)</label>
+        <input id="context" type="text" placeholder="Ej: hospital, outpatient clinic" />
+      </div>
 
-  </main>
+    </div>
+
+    <div class="actions">
+
+      <select id="window">
+        <option value="7">7 días</option>
+        <option value="30">30 días</option>
+        <option value="90">90 días</option>
+        <option value="365">1 año</option>
+      </select>
+
+      <button id="analyze">Analizar</button>
+      <button id="print" class="secondary">Imprimir / Guardar PDF</button>
+
+    </div>
+
+  </section>
+
+  <section id="results" class="card hidden">
+    <h2>Resultados</h2>
+    <div id="report"></div>
+  </section>
+
+  <footer style="text-align:center; margin:30px 0; color:rgba(255,255,255,0.4); font-size:13px;">
+    Creado por Ramón Morillo · Febrero 2026
+  </footer>
 
   <script type="module" src="js/app.js"></script>
 

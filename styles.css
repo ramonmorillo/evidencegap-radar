@@ -1,212 +1,318 @@
-/* ---------- GLOBAL ---------- */
+:root {
+  --bg1: #0b0f1a;
+  --bg2: #111a2e;
+  --glass: rgba(255, 255, 255, 0.06);
+  --glass-strong: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.12);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.55);
+
+  --accent: #6c7bff;
+  --accent2: #8a5cff;
+
+  --ok: #35d07f;
+  --warn: #ffb020;
+  --bad: #ff5c6c;
+  --info: #5cb8ff;
+  --violet: #b27bff;
+}
+
+/* ---------------- BASE ---------------- */
 
 * {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 body {
-  background: radial-gradient(circle at top left, #0f172a, #020617);
-  color: #e5e7eb;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+
+  background:
+    radial-gradient(circle at 20% 20%, #1a2b5c 0%, transparent 40%),
+    radial-gradient(circle at 80% 30%, #3b1f5c 0%, transparent 35%),
+    linear-gradient(135deg, var(--bg1), var(--bg2));
+
+  color: var(--text);
   min-height: 100vh;
-  padding: 40px 20px;
 }
 
-/* ---------- HEADER ---------- */
+/* ---------------- HEADER ---------------- */
 
-.header {
-  max-width: 1100px;
-  margin: 0 auto 30px auto;
+header {
+  padding: 36px 24px 12px;
+  text-align: center;
 }
 
-.header h1 {
+h1 {
+  margin: 0;
   font-size: 34px;
-  font-weight: 700;
-  background: linear-gradient(90deg, #e5e7eb, #818cf8);
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, white, var(--accent));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.author {
-  font-size: 14px;
-  color: #94a3b8;
-  margin-top: 6px;
-}
-
-/* ---------- LAYOUT ---------- */
-
-.container {
-  max-width: 1100px;
-  margin: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-/* ---------- CARD ---------- */
+/* ---------------- CARD PRINCIPAL ---------------- */
 
 .card {
-  background: rgba(15, 23, 42, 0.75);
-  border-radius: 18px;
-  padding: 24px;
+  max-width: 1100px;
+  margin: 20px auto;
+  padding: 26px 26px 30px;
+
+  background: var(--glass);
   backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+
+  border-radius: 18px;
+  border: 1px solid var(--border);
+
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-.card h2 {
-  font-size: 20px;
-  margin-bottom: 18px;
-  color: #e2e8f0;
-}
+/* ---------------- FORM ---------------- */
 
-/* ---------- GRID ---------- */
-
-.grid {
+.form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-top: 14px;
 }
 
-.field {
+.form-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  position: relative;
 }
 
 label {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--muted);
 }
 
-/* ---------- INPUTS ---------- */
-
 input, select {
-  background: rgba(2, 6, 23, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
   padding: 10px 12px;
-  color: #e5e7eb;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
   font-size: 14px;
-  outline: none;
-  transition: 0.2s;
 }
 
 input::placeholder {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.35);
 }
 
-input:focus, select:focus {
-  border-color: #818cf8;
-  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.4);
-}
-
-/* ---------- ACTIONS ---------- */
+/* ---------------- BOTONES ---------------- */
 
 .actions {
+  margin-top: 18px;
   display: flex;
   gap: 10px;
   align-items: center;
 }
 
 button {
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
   border: none;
-  border-radius: 10px;
-  padding: 10px 16px;
-  color: white;
+  border-radius: 12px;
+  padding: 10px 18px;
   font-size: 14px;
   cursor: pointer;
-  transition: 0.2s;
-  box-shadow: 0 10px 20px rgba(79, 70, 229, 0.35);
+
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+
+  box-shadow:
+    0 6px 18px rgba(108, 123, 255, 0.35);
+
+  transition: all 0.2s ease;
 }
 
 button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 14px 26px rgba(79, 70, 229, 0.45);
+  box-shadow:
+    0 10px 24px rgba(108, 123, 255, 0.45);
 }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
+button.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: none;
 }
 
-/* ---------- RESULTS ---------- */
+button.secondary:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* ---------------- RESULTS ---------------- */
+
+#results {
+  max-width: 1100px;
+  margin: 24px auto 40px;
+  padding: 22px 26px 30px;
+
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+
+  border-radius: 18px;
+  border: 1px solid var(--border);
+
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------------- KPI GRID ---------------- */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.kpi {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+}
+
+.kpi .sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.kpi .big {
+  font-size: 26px;
+  margin: 6px 0 10px;
+  font-weight: 600;
+}
+
+/* ---------------- METERS ---------------- */
+
+.meter {
+  height: 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
+
+/* ---------------- BADGES ---------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 6px 10px;
+  border-radius: 20px;
+
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot.ok { background: var(--ok); }
+.dot.warn { background: var(--warn); }
+.dot.bad { background: var(--bad); }
+.dot.info { background: var(--info); }
+.dot.violet { background: var(--violet); }
+
+/* ---------------- CHIPS ---------------- */
+
+.chips {
+  margin: 10px 0 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+
+/* ---------------- LISTS ---------------- */
+
+h3 {
+  margin: 18px 0 10px;
+  font-size: 15px;
+}
+
+.list {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.list li {
+  margin-bottom: 6px;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---------------- SUGGESTIONS ---------------- */
+
+.suggest-box {
+  position: relative;
+}
+
+.suggest-item {
+  background: rgba(20, 30, 60, 0.95);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.suggest-item:hover {
+  background: rgba(108, 123, 255, 0.25);
+}
+
+/* ---------------- UTIL ---------------- */
 
 .hidden {
   display: none;
 }
 
-#report {
-  margin-top: 10px;
-  line-height: 1.5;
-  font-size: 14px;
-}
+/* ---------------- PRINT ---------------- */
 
-/* ---------- BADGES ---------- */
-
-.badge {
-  display: inline-block;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  margin-right: 6px;
-  margin-top: 6px;
-}
-
-.badge.good {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
-}
-
-.badge.warn {
-  background: rgba(234, 179, 8, 0.15);
-  color: #facc15;
-}
-
-.badge.bad {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-}
-
-/* ---------- MeSH SUGGESTIONS ---------- */
-
-.suggestions {
-  position: absolute;
-  background: #020617;
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 10px;
-  margin-top: 4px;
-  width: 100%;
-  z-index: 50;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-}
-
-.suggest-item {
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #e5e7eb;
-  transition: 0.15s;
-}
-
-.suggest-item:hover {
-  background: rgba(99,102,241,0.2);
-}
-
-/* ---------- RESPONSIVE ---------- */
-
-@media (max-width: 768px) {
-  .grid {
-    grid-template-columns: 1fr;
+@media print {
+  body {
+    background: white;
+    color: black;
   }
 
-  .actions {
-    flex-wrap: wrap;
+  header, .actions button {
+    display: none;
+  }
+
+  #results {
+    box-shadow: none;
+    border: none;
   }
 }

@@ -5,77 +5,90 @@
   <title>EvidenceGap Radar</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- cache-busting -->
-  <link rel="stylesheet" href="styles.css?v=20260211_1" />
+  <!-- Evita 404 de favicon -->
   <link rel="icon" href="data:," />
+
+  <!-- Cache-busting para que SIEMPRE cargue la última versión -->
+  <link rel="stylesheet" href="styles.css?v=20260211_2" />
 </head>
 
 <body>
 
-  <header>
+  <header class="header">
     <h1>EvidenceGap Radar</h1>
+    <p class="author">Creado por Ramón Morillo · Febrero 2026</p>
   </header>
 
-  <section class="card">
-    <h2>PICO-lite</h2>
+  <main class="container">
 
-    <div class="form-grid">
-      <div class="form-group">
-        <label for="population">Población</label>
-        <input id="population" type="text" placeholder="Ej: VIH, outpatients, older adults" />
+    <!-- Texto explicativo (debajo del título, encima del formulario) -->
+    <section class="card" style="margin-bottom: 16px;">
+      <h2 style="margin-top:0;">¿Qué es esta herramienta?</h2>
+      <p style="margin: 0; opacity: 0.9; line-height: 1.45;">
+        EvidenceGap Radar genera una <b>fotografía rápida</b> del “paisaje de evidencia” de una pregunta tipo PICO-lite,
+        combinando señales de <b>PubMed</b> (publicaciones recientes + histórico) y <b>ClinicalTrials.gov</b> (ensayos).
+      </p>
+      <p style="margin: 10px 0 0; opacity: 0.75; line-height: 1.45;">
+        Útil para docencia y para orientar búsquedas. <b>No sustituye</b> lectura crítica ni evaluación metodológica.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>PICO-lite</h2>
+
+      <div class="grid">
+        <div class="field">
+          <label>Población</label>
+          <input id="population" type="text" placeholder="Ej: pacientes VIH" />
+        </div>
+
+        <div class="field">
+          <label>Intervención / Exposición</label>
+          <input id="intervention" type="text" placeholder="Ej: telefarmacia" autocomplete="off"/>
+          <div id="intervention-suggest" class="suggestions"></div>
+        </div>
+
+        <div class="field">
+          <label>Outcome</label>
+          <input id="outcome" type="text" placeholder="Ej: adherencia" autocomplete="off"/>
+          <div id="outcome-suggest" class="suggestions"></div>
+        </div>
+
+        <div class="field">
+          <label>Contexto (opcional)</label>
+          <input id="context" type="text" placeholder="Ej: farmacia hospitalaria" />
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="intervention">Intervención / Exposición</label>
-        <input id="intervention" type="text" placeholder="Ej: telepharmacy, motivational interviewing" />
+      <div class="actions">
+        <select id="window">
+          <option value="7">7 días</option>
+          <option value="30">30 días</option>
+          <option value="90">90 días</option>
+          <option value="365">1 año</option>
+        </select>
+
+        <button id="analyze">Analizar</button>
+
+        <!-- Botón reiniciar -->
+        <button id="reset" class="secondary" type="button">Reiniciar</button>
+
+        <button id="print">Imprimir / Guardar PDF</button>
       </div>
 
-      <div class="form-group">
-        <label for="outcome">Outcome</label>
-        <input id="outcome" type="text" placeholder="Ej: adherence, PROMs, safety" />
-      </div>
+      <!-- Caja de error opcional, por si tu app.js la usa -->
+      <div id="errorBox" class="hidden"></div>
+    </section>
 
-      <div class="form-group">
-        <label for="context">Contexto (opcional)</label>
-        <input id="context" type="text" placeholder="Ej: hospital, outpatient clinic" />
-      </div>
-    </div>
+    <section id="results" class="card hidden">
+      <h2>Resultados</h2>
+      <div id="report"></div>
+    </section>
 
-    <div class="actions">
-      <select id="window">
-        <option value="7">7 días</option>
-        <option value="30">30 días</option>
-        <option value="90">90 días</option>
-        <option value="365">1 año</option>
-      </select>
+  </main>
 
-      <button id="analyze">Analizar</button>
-      <button id="reset" class="secondary">Reiniciar</button>
-      <button id="print" class="secondary">Imprimir / Guardar PDF</button>
-    </div>
+  <!-- Cache-busting del JS para evitar que cargue app.js antiguo -->
+  <script type="module" src="js/app.js?v=20260211_2"></script>
 
-    <div id="errorBox" class="error-box hidden"></div>
-  </section>
-
-  <div class="info-box">
-    <h3>¿Qué es EvidenceGap Radar?</h3>
-    <p>
-      Herramienta exploratoria para obtener una fotografía del “paisaje de evidencia” de una pregunta PICO-lite
-      combinando señales de PubMed y ClinicalTrials.gov.
-    </p>
-    <p class="muted">No sustituye la lectura crítica ni la evaluación metodológica.</p>
-  </div>
-
-  <section id="results" class="card hidden">
-    <h2>Resultados</h2>
-    <div id="report"></div>
-  </section>
-
-  <footer style="text-align:center; margin:30px 0; color:rgba(255,255,255,0.45); font-size:13px;">
-    Creado por Ramón Morillo · Febrero 2026
-  </footer>
-
-  <!-- cache-busting -->
-  <script type="module" src="js/app.js?v=20260211_1"></script>
 </body>
 </html>

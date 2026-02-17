@@ -287,38 +287,59 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // PubMed recent
-      const esRecent = await getJson(
-        `/api/pubmed/esearch?term=${encodeURIComponent(term)}&reldate=${encodeURIComponent(reldate)}&retmax=10`,
-        { signal }
-      );
+      // --- Parallel batch 1: core data ---
+      const enc = encodeURIComponent(term);
+      const [esRecent, es10y, ct, esSrMa] = await Promise.all([
+        getJson(`/api/pubmed/esearch?term=${enc}&reldate=${encodeURIComponent(reldate)}&retmax=10`, { signal }),
+        getJson(`/api/pubmed/esearch?term=${enc}&reldate=3650&retmax=0`, { signal }),
+        getJson(`/api/ctgov/search?query=${enc}&pageSize=25`, { signal }),
+        getJson(`/api/pubmed/esearch?term=${enc}+AND+(systematic+review[pt]+OR+meta-analysis[pt])&reldate=3650&retmax=0`, { signal })
+          .catch(() => null)
+      ]);
+
       const pubRecent = Number(esRecent?.esearchresult?.count || 0);
       const idlist = esRecent?.esearchresult?.idlist || [];
+      const pub10y = Number(es10y?.esearchresult?.count || 0);
+      const srMaCount = esSrMa ? Number(esSrMa?.esearchresult?.count || 0) : null;
+
+      const studies = ct?.studies || ct?.results || [];
+      const trialN = Number(ct?.total || ct?.totalCount || studies.length || 0);
+
+      // --- Batch 2: esummary + year-by-year counts (parallel) ---
+      const yearDays = [365, 730, 1095, 1460, 1825];
+      const yearPromises = yearDays.map(d =>
+        getJson(`/api/pubmed/esearch?term=${enc}&reldate=${d}&retmax=0`, { signal })
+          .then(r => Number(r?.esearchresult?.count || 0))
+          .catch(() => 0)
+      );
 
       let topPubs = [];
-      if (idlist.length) {
-        const esum = await getJson(
-          `/api/pubmed/esummary?ids=${encodeURIComponent(idlist.join(","))}`,
-          { signal }
-        );
+      const esumPromise = idlist.length
+        ? getJson(`/api/pubmed/esummary?ids=${encodeURIComponent(idlist.join(","))}`, { signal })
+        : Promise.resolve(null);
+
+      const [esum, ...yCounts] = await Promise.all([esumPromise, ...yearPromises]);
+
+      if (esum) {
         const uids = esum?.result?.uids || [];
         topPubs = uids.map(uid => esum.result[uid]).filter(Boolean);
       }
 
-      // PubMed 10y
-      const es10y = await getJson(
-        `/api/pubmed/esearch?term=${encodeURIComponent(term)}&reldate=3650&retmax=0`,
-        { signal }
-      );
-      const pub10y = Number(es10y?.esearchresult?.count || 0);
+      // Build year-by-year data (derive per-year from cumulative)
+      const now = new Date().getFullYear();
+      const yearCounts = [];
+      for (let i = yCounts.length - 1; i >= 0; i--) {
+        const prev = i > 0 ? yCounts[i - 1] : 0;
+        const perYear = Math.max(0, yCounts[i] - prev);
+        yearCounts.push({ label: String(now - (i + 1)), value: perYear });
+      }
+      yearCounts.push({ label: String(now), value: pubRecent });
 
-      // ClinicalTrials
-      const ct = await getJson(
-        `/api/ctgov/search?query=${encodeURIComponent(term)}&pageSize=25`,
-        { signal }
-      );
-      const studies = ct?.studies || ct?.results || [];
-      const trialN = Number(ct?.total || ct?.totalCount || studies.length || 0);
+      // Extract publication types from topPubs
+      const pubTypeCounts = {};
+      for (const p of topPubs) {
+        for (const t of (p.pubtype || [])) { pubTypeCounts[t] = (pubTypeCounts[t] || 0) + 1; }
+      }
 
       if (pubRecent === 0 && pub10y === 0 && trialN === 0) { showEmpty(); return; }
 
@@ -335,7 +356,8 @@ document.addEventListener("DOMContentLoaded", () => {
         query, pub10y, pubRecent,
         trials: { n: trialN, statusCounts, phaseCounts },
         evidenceClass, opps, topPubs,
-        searchTerm: term, reldate
+        searchTerm: term, reldate,
+        srMaCount, yearCounts, pubTypeCounts
       });
 
       report.innerHTML = html;

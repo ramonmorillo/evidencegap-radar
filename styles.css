@@ -111,6 +111,7 @@ input::placeholder {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 button {
@@ -135,6 +136,12 @@ button:hover {
     0 10px 24px rgba(108, 123, 255, 0.45);
 }
 
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 button.secondary {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
@@ -144,6 +151,95 @@ button.secondary {
 
 button.secondary:hover {
   background: rgba(255, 255, 255, 0.16);
+}
+
+/* ---------------- LOADING ---------------- */
+
+.loading-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(108, 123, 255, 0.1);
+  border: 1px solid rgba(108, 123, 255, 0.25);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------------- ERROR BOX ---------------- */
+
+.error-box {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 92, 108, 0.12);
+  border: 1px solid rgba(255, 92, 108, 0.35);
+  color: var(--bad);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* ---------------- EMPTY STATE ---------------- */
+
+.empty-state {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--muted);
+}
+
+.empty-state p:first-child {
+  font-size: 18px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+/* ---------------- CACHE BADGE ---------------- */
+
+.results-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.results-header h2 {
+  margin: 0;
+}
+
+.cache-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  background: rgba(53, 208, 127, 0.12);
+  border: 1px solid rgba(53, 208, 127, 0.3);
+  color: var(--ok);
+}
+
+.cache-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
 }
 
 /* ---------------- RESULTS ---------------- */
@@ -296,7 +392,7 @@ a:hover {
 /* ---------------- UTIL ---------------- */
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 /* ---------------- PRINT ---------------- */
@@ -308,6 +404,10 @@ a:hover {
   }
 
   header, .actions button {
+    display: none;
+  }
+
+  .loading-box, .error-box, .cache-badge {
     display: none;
   }
 

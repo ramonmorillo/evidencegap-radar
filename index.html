@@ -4,12 +4,8 @@
   <meta charset="UTF-8" />
   <title>EvidenceGap Radar</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Evita 404 de favicon -->
   <link rel="icon" href="data:," />
-
-  <!-- Cache-busting para que SIEMPRE cargue la última versión -->
-  <link rel="stylesheet" href="styles.css?v=20260217_1" />
+  <link rel="stylesheet" href="styles.css?v=20260217_2" />
 </head>
 
 <body>
@@ -21,7 +17,7 @@
 
   <main class="container">
 
-    <!-- Texto explicativo (debajo del título, encima del formulario) -->
+    <!-- Texto explicativo -->
     <section class="card" style="margin-bottom: 16px;">
       <h2 style="margin-top:0;">¿Qué es esta herramienta?</h2>
       <p style="margin: 0; opacity: 0.9; line-height: 1.45;">
@@ -33,30 +29,53 @@
       </p>
     </section>
 
+    <!-- PICO-lite form -->
     <section class="card">
-      <h2>PICO-lite</h2>
+      <div class="form-header">
+        <h2>PICO-lite</h2>
+        <div class="example-bar">
+          <label>Ejemplos docentes:</label>
+          <select id="exampleSelector">
+            <option value="">— Seleccionar ejemplo —</option>
+          </select>
+        </div>
+      </div>
 
       <div class="grid">
         <div class="field">
           <label>Población</label>
           <input id="population" type="text" placeholder="Ej: pacientes VIH" />
+          <div class="syn-area">
+            <div class="syn-chips" id="synChips-population"></div>
+            <input class="syn-input" data-field="population" placeholder="+ sinónimo (Enter)" />
+          </div>
         </div>
 
         <div class="field">
           <label>Intervención / Exposición</label>
-          <input id="intervention" type="text" placeholder="Ej: telefarmacia" autocomplete="off"/>
-          <div id="intervention-suggest" class="suggestions"></div>
+          <input id="intervention" type="text" placeholder="Ej: telefarmacia" autocomplete="off" />
+          <div class="syn-area">
+            <div class="syn-chips" id="synChips-intervention"></div>
+            <input class="syn-input" data-field="intervention" placeholder="+ sinónimo (Enter)" />
+          </div>
         </div>
 
         <div class="field">
           <label>Outcome</label>
-          <input id="outcome" type="text" placeholder="Ej: adherencia" autocomplete="off"/>
-          <div id="outcome-suggest" class="suggestions"></div>
+          <input id="outcome" type="text" placeholder="Ej: adherencia" autocomplete="off" />
+          <div class="syn-area">
+            <div class="syn-chips" id="synChips-outcome"></div>
+            <input class="syn-input" data-field="outcome" placeholder="+ sinónimo (Enter)" />
+          </div>
         </div>
 
         <div class="field">
           <label>Contexto (opcional)</label>
           <input id="context" type="text" placeholder="Ej: farmacia hospitalaria" />
+          <div class="syn-area">
+            <div class="syn-chips" id="synChips-context"></div>
+            <input class="syn-input" data-field="context" placeholder="+ sinónimo (Enter)" />
+          </div>
         </div>
       </div>
 
@@ -69,13 +88,8 @@
         </select>
 
         <button id="analyze">Analizar</button>
-
-        <!-- Botón reiniciar -->
         <button id="reset" class="secondary" type="button">Reiniciar</button>
-
-        <!-- Limpiar caché -->
         <button id="clearCache" class="secondary" type="button">Limpiar caché</button>
-
         <button id="print">Imprimir / Guardar PDF</button>
       </div>
 
@@ -89,6 +103,20 @@
       <div id="errorBox" class="error-box hidden"></div>
     </section>
 
+    <!-- Query Builder -->
+    <section class="card" id="queryBuilderCard">
+      <h2>Estrategia de búsqueda</h2>
+
+      <div class="strategy-human" id="strategyHuman"></div>
+
+      <label class="qb-label">PubMed Query (editable)</label>
+      <div class="query-row">
+        <textarea id="queryPreview" rows="3" spellcheck="false" placeholder="La query se genera automáticamente al escribir en los campos PICO…"></textarea>
+        <button id="copyQuery" class="secondary" type="button" title="Copiar al portapapeles">Copiar</button>
+      </div>
+    </section>
+
+    <!-- Resultados -->
     <section id="results" class="card hidden">
       <div class="results-header">
         <h2>Resultados</h2>
@@ -99,8 +127,7 @@
 
   </main>
 
-  <!-- Cache-busting del JS para evitar que cargue app.js antiguo -->
-  <script type="module" src="js/app.js?v=20260217_1"></script>
+  <script type="module" src="js/app.js?v=20260217_2"></script>
 
 </body>
 </html>

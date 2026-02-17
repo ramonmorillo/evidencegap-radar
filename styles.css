@@ -298,21 +298,97 @@ a:hover { text-decoration: underline; }
 .pie-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text); }
 .pie-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
+/* ---------------- PUB TABLE ---------------- */
+.table-wrap { overflow-x: auto; margin-bottom: 12px; }
+
+.pub-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.pub-table th {
+  text-align: left; padding: 8px 10px; font-size: 12px; color: var(--muted);
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.pub-table td {
+  padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  vertical-align: top;
+}
+.pub-table tr:hover { background: rgba(255,255,255,0.03); }
+.pub-table a { font-size: 13px; }
+
+/* Publication type tags */
+.pub-tag {
+  display: inline-block; padding: 2px 6px; border-radius: 8px;
+  font-size: 10px; font-weight: 600; margin-right: 3px;
+}
+.tag-sr { background: rgba(178,123,255,0.2); color: var(--violet); }
+.tag-ma { background: rgba(108,123,255,0.2); color: var(--accent); }
+.tag-rct { background: rgba(53,208,127,0.2); color: var(--ok); }
+.tag-obs { background: rgba(255,176,32,0.2); color: var(--warn); }
+.tag-review { background: rgba(92,184,255,0.2); color: var(--info); }
+.tag-other { background: rgba(255,255,255,0.08); color: var(--muted); }
+
+/* Table filter buttons */
+.table-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+
+.filter-btn {
+  padding: 4px 10px; border-radius: 10px; font-size: 11px; cursor: pointer;
+  background: rgba(255,255,255,0.06); color: var(--muted);
+  border: 1px solid var(--border); box-shadow: none;
+  transition: all 0.15s ease;
+}
+.filter-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+.filter-btn.active { background: rgba(108,123,255,0.2); color: var(--accent); border-color: rgba(108,123,255,0.4); }
+
+/* Export bar */
+.export-bar { display: flex; gap: 8px; margin-top: 12px; }
+
 /* ---------------- UTIL ---------------- */
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
 
-/* ---------------- PRINT ---------------- */
+/* ---------------- PRINT (report layout) ---------------- */
 @media print {
-  body { background: white; color: black; }
-  header, .actions, .example-bar, .syn-area, #queryBuilderCard { display: none; }
-  .loading-box, .error-box, .cache-badge { display: none; }
-  .card { box-shadow: none; border: 1px solid #ddd; background: white; backdrop-filter: none; }
-  #results { box-shadow: none; border: none; }
-  .strategy-used { background: #f5f5f5; border: 1px solid #ddd; }
-  .strategy-code { background: #eee; color: #333; }
-  .kpi { background: #f9f9f9; border: 1px solid #ddd; }
-  .meter span { background: #666; }
+  body { background: white !important; color: black !important; }
+
+  /* Hide interactive elements */
+  header, .actions, .example-bar, .syn-area, #queryBuilderCard,
+  .loading-box, .error-box, .cache-badge, .export-bar, .table-filters { display: none !important; }
+
+  /* Reset cards */
+  .card { box-shadow: none; border: 1px solid #ddd; background: white !important; backdrop-filter: none; }
+  #results { box-shadow: none; border: none; padding: 0; margin: 0; }
+
+  /* Report header */
+  .strategy-used {
+    background: #f5f5f5 !important; border: 1px solid #ddd;
+    page-break-after: avoid;
+  }
+  .strategy-code { background: #eee !important; color: #333 !important; }
+
+  /* Dashboard cards */
+  .dash-card { background: #f9f9f9 !important; border: 1px solid #ddd; }
+  .kpi { background: #f9f9f9 !important; border: 1px solid #ddd; }
+  .meter span { background: #666 !important; }
+  .kpi .big { color: black; }
+  .kpi .sub { color: #666; }
+  .dash-card h3 { color: #333; }
+
+  /* Charts */
+  .charts-grid { page-break-inside: avoid; }
+  .chart-card { background: #f9f9f9 !important; border: 1px solid #ddd; }
+  .chart-card h4 { color: #666; }
+  .bar { background: #666 !important; }
+  .hbar-fill { background: #666 !important; }
+
+  /* Table */
+  .pub-table th { color: #333; border-bottom: 2px solid #333; }
+  .pub-table td { border-bottom: 1px solid #ddd; color: black; }
+  .pub-table a { color: #0066cc; }
+  .pub-tag { border: 1px solid #999; background: #eee !important; color: #333; }
+
+  /* Chips, badges */
+  .chip { background: #eee !important; border: 1px solid #ccc; color: black; }
+  .badge { background: #eee !important; border: 1px solid #ccc; color: #333; }
   a { color: #0066cc; }
 }
 

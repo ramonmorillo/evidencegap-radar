@@ -99,9 +99,14 @@ export function renderResults(data) {
   const oppsHtml = `<h3>Oportunidades sugeridas</h3>
     <ol class="list">${(opps || []).map(x => `<li>${esc(x)}</li>`).join("")}</ol>`;
 
-  // --- Pubs ---
-  const pubsHtml = `<h3>Publicaciones recientes (muestra)</h3>
-    <ol class="list">${pubsList || "<li>Sin publicaciones en la ventana seleccionada.</li>"}</ol>`;
+  // --- Top 20 table ---
+  const tableHtml = buildPubTable(topPubs);
+
+  // --- Export buttons ---
+  const exportHtml = `<div class="export-bar">
+    <button class="secondary" id="exportCSV" type="button">Exportar CSV</button>
+    <button class="secondary" id="exportRIS" type="button">Exportar RIS</button>
+  </div>`;
 
   // --- Assemble dashboard ---
   return `
@@ -118,7 +123,11 @@ export function renderResults(data) {
     </div>
 
     ${oppsHtml}
-    ${pubsHtml}
+
+    <h3>Top ${topPubs.length} art\u00edculos</h3>
+    <div class="table-filters" id="pubTypeFilters"></div>
+    ${tableHtml}
+    ${exportHtml}
   `;
 }
 
@@ -149,4 +158,46 @@ function classifyBadge(label) {
   if (t.includes("saturado")) return { dot: "violet" };
   if (t.includes("maduro")) return { dot: "ok" };
   return { dot: "info" };
+}
+
+// --- Publication type tagging ---
+function classifyPubType(pubtype) {
+  const types = (pubtype || []).map(t => t.toLowerCase());
+  const tags = [];
+  if (types.some(t => t.includes("systematic review"))) tags.push("SR");
+  if (types.some(t => t.includes("meta-analysis"))) tags.push("MA");
+  if (types.some(t => t.includes("randomized controlled trial") || t.includes("clinical trial"))) tags.push("RCT");
+  if (types.some(t => t.includes("observational") || t.includes("cohort") || t.includes("case-control") || t.includes("cross-sectional"))) tags.push("OBS");
+  if (types.some(t => t.includes("review") && !t.includes("systematic"))) tags.push("Review");
+  if (!tags.length) tags.push("Other");
+  return tags;
+}
+
+function pubTagClass(tag) {
+  const m = { SR: "tag-sr", MA: "tag-ma", RCT: "tag-rct", OBS: "tag-obs", Review: "tag-review" };
+  return m[tag] || "tag-other";
+}
+
+function buildPubTable(pubs) {
+  if (!pubs?.length) return '<p class="muted">Sin publicaciones en la ventana seleccionada.</p>';
+
+  const rows = pubs.map(p => {
+    const id = p.uid || "";
+    const title = esc(p.title || "Sin t\u00edtulo");
+    const journal = esc(p.fulljournalname || p.source || "");
+    const year = (p.pubdate || "").split(" ")[0] || "";
+    const tags = classifyPubType(p.pubtype);
+    const tagHtml = tags.map(t => `<span class="pub-tag ${pubTagClass(t)}">${t}</span>`).join("");
+    return `<tr data-tags="${tags.join(",")}"">
+      <td><a href="https://pubmed.ncbi.nlm.nih.gov/${id}/" target="_blank" rel="noreferrer">${title}</a></td>
+      <td>${esc(year)}</td>
+      <td>${journal}</td>
+      <td>${tagHtml}</td>
+    </tr>`;
+  }).join("");
+
+  return `<div class="table-wrap"><table class="pub-table" id="pubTable">
+    <thead><tr><th>T\u00edtulo</th><th>A\u00f1o</th><th>Journal</th><th>Tipo</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
 }

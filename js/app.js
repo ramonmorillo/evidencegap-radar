@@ -1,6 +1,7 @@
 import { getJson } from "./api.js";
 import { renderResults } from "./report.js";
 import { hashKey, cacheGet, cacheSet, cacheClear, cacheCount } from "./cache.js";
+import { exportCSV, exportRIS } from "./export.js";
 import { EXAMPLES } from "./examples.js";
 
 const PERSIST_KEY = "egr_lastSearch";
@@ -290,7 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // --- Parallel batch 1: core data ---
       const enc = encodeURIComponent(term);
       const [esRecent, es10y, ct, esSrMa] = await Promise.all([
-        getJson(`/api/pubmed/esearch?term=${enc}&reldate=${encodeURIComponent(reldate)}&retmax=10`, { signal }),
+        getJson(`/api/pubmed/esearch?term=${enc}&reldate=${encodeURIComponent(reldate)}&retmax=20`, { signal }),
         getJson(`/api/pubmed/esearch?term=${enc}&reldate=3650&retmax=0`, { signal }),
         getJson(`/api/ctgov/search?query=${enc}&pageSize=25`, { signal }),
         getJson(`/api/pubmed/esearch?term=${enc}+AND+(systematic+review[pt]+OR+meta-analysis[pt])&reldate=3650&retmax=0`, { signal })
@@ -365,12 +366,54 @@ document.addEventListener("DOMContentLoaded", () => {
       cacheSet(cacheKey, html);
       updateCacheBadge();
 
+      // --- Post-render: wire export buttons & table filters ---
+      wireExportButtons(topPubs);
+      wireTableFilters();
+
     } catch (e) {
       if (e?.name === "AbortError") return;
       showError(e?._userMessage || `Error: ${e?.message || String(e)}`);
     } finally {
       showLoading(false);
     }
+  }
+
+  // ===================== Post-render wiring =====================
+
+  function wireExportButtons(pubs) {
+    const btnCSV = document.getElementById("exportCSV");
+    const btnRIS = document.getElementById("exportRIS");
+    if (btnCSV) btnCSV.onclick = () => exportCSV(pubs, "evidencegap_results.csv");
+    if (btnRIS) btnRIS.onclick = () => exportRIS(pubs, "evidencegap_results.ris");
+  }
+
+  function wireTableFilters() {
+    const container = document.getElementById("pubTypeFilters");
+    const table = document.getElementById("pubTable");
+    if (!container || !table) return;
+
+    // Collect all unique tags
+    const allTags = new Set();
+    table.querySelectorAll("tbody tr").forEach(tr => {
+      (tr.dataset.tags || "").split(",").forEach(t => { if (t) allTags.add(t); });
+    });
+
+    // Build filter buttons
+    container.innerHTML = '<button class="filter-btn active" data-filter="all">Todos</button>' +
+      [...allTags].map(t => `<button class="filter-btn" data-filter="${t}">${t}</button>`).join("");
+
+    container.querySelectorAll(".filter-btn").forEach(btn => {
+      btn.onclick = () => {
+        container.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const filter = btn.dataset.filter;
+        table.querySelectorAll("tbody tr").forEach(tr => {
+          if (filter === "all") { tr.style.display = ""; return; }
+          const tags = (tr.dataset.tags || "").split(",");
+          tr.style.display = tags.includes(filter) ? "" : "none";
+        });
+      };
+    });
   }
 
   // ===================== Reset =====================

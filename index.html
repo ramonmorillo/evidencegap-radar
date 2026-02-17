@@ -9,7 +9,7 @@
   <link rel="icon" href="data:," />
 
   <!-- Cache-busting para que SIEMPRE cargue la última versión -->
-  <link rel="stylesheet" href="styles.css?v=20260211_2" />
+  <link rel="stylesheet" href="styles.css?v=20260217_1" />
 </head>
 
 <body>
@@ -25,7 +25,7 @@
     <section class="card" style="margin-bottom: 16px;">
       <h2 style="margin-top:0;">¿Qué es esta herramienta?</h2>
       <p style="margin: 0; opacity: 0.9; line-height: 1.45;">
-        EvidenceGap Radar genera una <b>fotografía rápida</b> del “paisaje de evidencia” de una pregunta tipo PICO-lite,
+        EvidenceGap Radar genera una <b>fotografía rápida</b> del "paisaje de evidencia" de una pregunta tipo PICO-lite,
         combinando señales de <b>PubMed</b> (publicaciones recientes + histórico) y <b>ClinicalTrials.gov</b> (ensayos).
       </p>
       <p style="margin: 10px 0 0; opacity: 0.75; line-height: 1.45;">
@@ -73,22 +73,34 @@
         <!-- Botón reiniciar -->
         <button id="reset" class="secondary" type="button">Reiniciar</button>
 
+        <!-- Limpiar caché -->
+        <button id="clearCache" class="secondary" type="button">Limpiar caché</button>
+
         <button id="print">Imprimir / Guardar PDF</button>
       </div>
 
-      <!-- Caja de error opcional, por si tu app.js la usa -->
-      <div id="errorBox" class="hidden"></div>
+      <!-- Loading spinner -->
+      <div id="loadingBox" class="loading-box hidden">
+        <span class="spinner"></span>
+        <span>Consultando PubMed y ClinicalTrials.gov…</span>
+      </div>
+
+      <!-- Caja de error -->
+      <div id="errorBox" class="error-box hidden"></div>
     </section>
 
     <section id="results" class="card hidden">
-      <h2>Resultados</h2>
+      <div class="results-header">
+        <h2>Resultados</h2>
+        <span id="cacheIndicator" class="cache-badge hidden">Resultados en caché</span>
+      </div>
       <div id="report"></div>
     </section>
 
   </main>
 
   <!-- Cache-busting del JS para evitar que cargue app.js antiguo -->
-  <script type="module" src="js/app.js?v=20260211_2"></script>
+  <script type="module" src="js/app.js?v=20260217_1"></script>
 
 </body>
 </html>

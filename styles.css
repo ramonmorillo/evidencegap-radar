@@ -46,6 +46,17 @@ h1 {
   box-shadow: 0 10px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
+/* ---------------- INTRO CARD ---------------- */
+.intro-card { padding: 18px 24px 20px; margin-bottom: 16px; }
+.intro-main {
+  margin: 0; font-size: 14px; line-height: 1.55;
+  color: rgba(255,255,255,0.88);
+}
+.intro-note {
+  margin: 8px 0 0; font-size: 13px; line-height: 1.5;
+  color: var(--muted); font-style: italic;
+}
+
 /* ---------------- FORM ---------------- */
 .form-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 .form-header h2 { margin: 0; }
@@ -549,6 +560,10 @@ a:hover { text-decoration: underline; }
   header, .actions, .example-bar, .syn-area, #queryBuilderCard,
   .loading-box, .error-box, .cache-badge, .export-bar, .table-filters,
   .mesh-toggle, .mesh-notice, .mesh-chips, .ac-dropdown { display: none !important; }
+
+  /* Intro card */
+  .intro-main { color: #333; }
+  .intro-note { color: #666; }
 
   /* MeSH strategy panel */
   .mesh-strategy-panel { background: #f5f5f5 !important; border: 1px solid #ddd; }

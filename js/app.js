@@ -49,6 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let meshMode = false;
   let currentController = null;
   let meshAcController = null;
+  let _runId = 0;
 
   // ===================== UI helpers =====================
 
@@ -56,7 +57,13 @@ document.addEventListener("DOMContentLoaded", () => {
   function clearError()   { errorBox.textContent = ""; errorBox.classList.add("hidden"); }
 
   function showLoading(show) {
-    if (loadingBox) loadingBox.classList.toggle("hidden", !show);
+    if (loadingBox) {
+      loadingBox.classList.toggle("hidden", !show);
+      if (show) {
+        const span = loadingBox.querySelector("span:last-child");
+        if (span) span.textContent = "Consultando PubMed y ClinicalTrials.gov\u2026";
+      }
+    }
     btnAnalyze.disabled = show;
     btnAnalyze.textContent = show ? "Analizando\u2026" : "Analizar";
   }
@@ -423,6 +430,15 @@ document.addEventListener("DOMContentLoaded", () => {
     currentController = new AbortController();
     const { signal } = currentController;
     showLoading(true);
+    const myRunId = ++_runId;
+
+    // Retry UI feedback — update loading text on any 429 retry
+    const onRetry = () => {
+      if (loadingBox) {
+        const span = loadingBox.querySelector("span:last-child");
+        if (span) span.textContent = "Rate limit \u2014 reintentando autom\u00e1ticamente\u2026";
+      }
+    };
 
     try {
       const term = (queryPreview?.value || buildTerm()).trim();
@@ -462,10 +478,10 @@ document.addEventListener("DOMContentLoaded", () => {
       // --- Parallel batch 1: core data ---
       const enc = encodeURIComponent(term);
       const [esRecent, es10y, ct, esSrMa] = await Promise.all([
-        getJson(`/api/pubmed/esearch?term=${enc}&reldate=${encodeURIComponent(reldate)}&retmax=20`, { signal }),
-        getJson(`/api/pubmed/esearch?term=${enc}&reldate=3650&retmax=0`, { signal }),
-        getJson(`/api/ctgov/search?query=${enc}&pageSize=25`, { signal }),
-        getJson(`/api/pubmed/esearch?term=${enc}+AND+(systematic+review[pt]+OR+meta-analysis[pt])&reldate=3650&retmax=0`, { signal })
+        getJson(`/api/pubmed/esearch?term=${enc}&reldate=${encodeURIComponent(reldate)}&retmax=20`, { signal, onRetry }),
+        getJson(`/api/pubmed/esearch?term=${enc}&reldate=3650&retmax=0`, { signal, onRetry }),
+        getJson(`/api/ctgov/search?query=${enc}&pageSize=25`, { signal, onRetry }),
+        getJson(`/api/pubmed/esearch?term=${enc}+AND+(systematic+review[pt]+OR+meta-analysis[pt])&reldate=3650&retmax=0`, { signal, onRetry })
           .catch(() => null)
       ]);
 
@@ -480,14 +496,14 @@ document.addEventListener("DOMContentLoaded", () => {
       // --- Batch 2: esummary + year-by-year counts (parallel) ---
       const yearDays = [365, 730, 1095, 1460, 1825];
       const yearPromises = yearDays.map(d =>
-        getJson(`/api/pubmed/esearch?term=${enc}&reldate=${d}&retmax=0`, { signal })
+        getJson(`/api/pubmed/esearch?term=${enc}&reldate=${d}&retmax=0`, { signal, onRetry })
           .then(r => Number(r?.esearchresult?.count || 0))
           .catch(() => 0)
       );
 
       let topPubs = [];
       const esumPromise = idlist.length
-        ? getJson(`/api/pubmed/esummary?ids=${encodeURIComponent(idlist.join(","))}`, { signal })
+        ? getJson(`/api/pubmed/esummary?ids=${encodeURIComponent(idlist.join(","))}`, { signal, onRetry })
         : Promise.resolve(null);
 
       const [esum, ...yCounts] = await Promise.all([esumPromise, ...yearPromises]);
@@ -512,6 +528,8 @@ document.addEventListener("DOMContentLoaded", () => {
       for (const p of topPubs) {
         for (const t of (p.pubtype || [])) { pubTypeCounts[t] = (pubTypeCounts[t] || 0) + 1; }
       }
+
+      if (myRunId !== _runId) return; // stale run — a newer analysis was launched
 
       if (pubRecent === 0 && pub10y === 0 && trialN === 0) { showEmpty(); return; }
 

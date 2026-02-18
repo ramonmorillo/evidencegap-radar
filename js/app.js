@@ -3,6 +3,7 @@ import { renderResults } from "./report.js";
 import { hashKey, cacheGet, cacheSet, cacheClear, cacheCount } from "./cache.js";
 import { exportCSV, exportRIS } from "./export.js";
 import { EXAMPLES } from "./examples.js";
+import { meshAutocomplete, buildMeshQuery, renderMeshStrategyPanel } from "./mesh.js";
 
 const PERSIST_KEY = "egr_lastSearch";
 const FIELDS = ["population", "intervention", "outcome", "context"];
@@ -39,12 +40,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const queryPreview   = $("queryPreview");
   const strategyHuman  = $("strategyHuman");
   const exampleSel     = $("exampleSelector");
+  const meshToggle     = $("meshToggle");
+  const meshNotice     = $("meshNotice");
 
-  // --- Synonym state ---
+  // --- State ---
   const synonyms = { population: [], intervention: [], outcome: [], context: [] };
-
-  // --- AbortController ---
+  const meshTerms = { population: [], intervention: [], outcome: [], context: [] };
+  let meshMode = false;
   let currentController = null;
+  let meshAcController = null;
 
   // ===================== UI helpers =====================
 
@@ -69,6 +73,131 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateCacheBadge() {
     if (btnClearCache) btnClearCache.title = `${cacheCount()} entrada(s) en cach\u00e9`;
+  }
+
+  // ===================== MeSH mode toggle =====================
+
+  function setMeshMode(on) {
+    meshMode = on;
+    if (meshToggle) meshToggle.checked = on;
+    if (meshNotice) meshNotice.classList.toggle("hidden", !on);
+
+    FIELDS.forEach(f => {
+      const synArea = $(`synArea-${f}`);
+      const meshChips = $(`meshChips-${f}`);
+      if (synArea) synArea.classList.toggle("hidden", on);
+      if (meshChips) meshChips.classList.toggle("hidden", !on);
+    });
+
+    updateQueryPreview();
+  }
+
+  if (meshToggle) {
+    meshToggle.addEventListener("change", () => setMeshMode(meshToggle.checked));
+  }
+
+  // ===================== MeSH Autocomplete =====================
+
+  const debouncedMeshAc = debounce(async (field, term) => {
+    const drop = $(`acDrop-${field}`);
+    if (!drop) return;
+    if (!term || term.length < 2) { drop.classList.add("hidden"); return; }
+
+    if (meshAcController) meshAcController.abort();
+    meshAcController = new AbortController();
+
+    try {
+      const items = await meshAutocomplete(term, meshAcController.signal);
+      if (!items.length) { drop.classList.add("hidden"); return; }
+
+      drop.innerHTML = items.map((it, i) =>
+        `<div class="ac-item" data-idx="${i}"><span class="ac-label">${esc(it.label)}</span><small class="ac-type">${esc(it.type)}</small></div>`
+      ).join("");
+      drop.classList.remove("hidden");
+
+      drop.querySelectorAll(".ac-item").forEach(el => {
+        el.onclick = () => {
+          const idx = Number(el.dataset.idx);
+          addMeshTerm(field, items[idx]);
+          drop.classList.add("hidden");
+          inputs[field].value = "";
+        };
+      });
+    } catch (e) {
+      if (e?.name !== "AbortError") drop.classList.add("hidden");
+    }
+  }, 300);
+
+  // Attach autocomplete to inputs (only active in MeSH mode)
+  FIELDS.forEach(f => {
+    inputs[f].addEventListener("input", () => {
+      if (!meshMode) return;
+      debouncedMeshAc(f, inputs[f].value.trim());
+    });
+
+    // Close dropdown on blur (with slight delay for click)
+    inputs[f].addEventListener("blur", () => {
+      setTimeout(() => {
+        const drop = $(`acDrop-${f}`);
+        if (drop) drop.classList.add("hidden");
+      }, 200);
+    });
+  });
+
+  // ===================== MeSH Chips =====================
+
+  function addMeshTerm(field, item) {
+    if (meshTerms[field].some(t => t.ui === item.ui)) return;
+    meshTerms[field].push({
+      label: item.label,
+      ui: item.ui,
+      type: item.type,
+      explode: true,
+      major: false
+    });
+    renderMeshChips(field);
+    updateQueryPreview();
+  }
+
+  function removeMeshTerm(field, idx) {
+    meshTerms[field].splice(idx, 1);
+    renderMeshChips(field);
+    updateQueryPreview();
+  }
+
+  function toggleMeshOption(field, idx, option) {
+    const t = meshTerms[field][idx];
+    if (!t) return;
+    t[option] = !t[option];
+    renderMeshChips(field);
+    updateQueryPreview();
+  }
+
+  function renderMeshChips(field) {
+    const container = $(`meshChips-${field}`);
+    if (!container) return;
+    if (!meshTerms[field].length) {
+      container.innerHTML = '<span class="muted" style="font-size:12px">Escribe arriba para buscar t\u00e9rminos MeSH</span>';
+      return;
+    }
+    container.innerHTML = meshTerms[field].map((t, i) => {
+      const expClass = t.explode ? "active" : "";
+      const majClass = t.major ? "active" : "";
+      return `<span class="mesh-chip">
+        <span class="mesh-chip-label">${esc(t.label)}</span>
+        <small class="mesh-chip-ui">${esc(t.ui)}</small>
+        <button type="button" class="mesh-opt ${expClass}" data-field="${field}" data-idx="${i}" data-opt="explode" title="Explode">Exp</button>
+        <button type="button" class="mesh-opt ${majClass}" data-field="${field}" data-idx="${i}" data-opt="major" title="Major Topic">Maj</button>
+        <button type="button" class="mesh-remove" data-field="${field}" data-idx="${i}" title="Eliminar">\u00d7</button>
+      </span>`;
+    }).join("");
+
+    container.querySelectorAll(".mesh-opt").forEach(btn => {
+      btn.onclick = () => toggleMeshOption(btn.dataset.field, Number(btn.dataset.idx), btn.dataset.opt);
+    });
+    container.querySelectorAll(".mesh-remove").forEach(btn => {
+      btn.onclick = () => removeMeshTerm(btn.dataset.field, Number(btn.dataset.idx));
+    });
   }
 
   // ===================== Synonym chips =====================
@@ -116,6 +245,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function buildTerm() {
+    if (meshMode) {
+      return buildMeshQuery(meshTerms);
+    }
     const parts = [];
     for (const f of FIELDS) {
       const terms = getAllTerms(f);
@@ -137,6 +269,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateStrategyHuman() {
     if (!strategyHuman) return;
+
+    if (meshMode) {
+      let html = "";
+      for (const f of FIELDS) {
+        if (!meshTerms[f]?.length) continue;
+        const label = FIELD_LABELS[f];
+        const chips = meshTerms[f].map(t => {
+          const flags = [];
+          flags.push(t.explode ? "Exp" : "noexp");
+          if (t.major) flags.push("Major");
+          return `<span class="chip">${esc(t.label)} <small>[${flags.join(",")}]</small></span>`;
+        }).join("");
+        html += `<div class="strategy-row"><span class="strategy-label">${label}</span><div class="strategy-terms">${chips}</div></div>`;
+      }
+      strategyHuman.innerHTML = html || '<p class="muted">Busca t\u00e9rminos MeSH en los campos PICO.</p>';
+      return;
+    }
+
     let html = "";
     for (const f of FIELDS) {
       const terms = getAllTerms(f);
@@ -149,7 +299,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   FIELDS.forEach(f => {
-    if (inputs[f]) inputs[f].addEventListener("input", updateQueryPreview);
+    if (inputs[f]) inputs[f].addEventListener("input", () => {
+      if (!meshMode) updateQueryPreview();
+    });
   });
 
   if (btnCopyQuery) {
@@ -183,6 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (idx === "") return;
       const ex = EXAMPLES[Number(idx)];
       if (!ex) return;
+      if (meshMode) setMeshMode(false);
       FIELDS.forEach(f => {
         inputs[f].value = ex[f] || "";
         synonyms[f] = [...(ex.synonyms?.[f] || [])];
@@ -232,7 +385,9 @@ document.addEventListener("DOMContentLoaded", () => {
         outcome: inputs.outcome.value,
         context: inputs.context.value,
         window: windowSel.value,
-        synonyms
+        synonyms,
+        meshMode,
+        meshTerms
       }));
     } catch { /* ignore */ }
   }
@@ -248,8 +403,13 @@ document.addEventListener("DOMContentLoaded", () => {
           synonyms[f] = [...s.synonyms[f]];
           renderChips(f);
         }
+        if (s.meshTerms?.[f]) {
+          meshTerms[f] = [...s.meshTerms[f]];
+          renderMeshChips(f);
+        }
       });
       if (s.window) windowSel.value = s.window;
+      if (s.meshMode) setMeshMode(true);
     } catch { /* ignore */ }
   }
 
@@ -266,6 +426,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const term = (queryPreview?.value || buildTerm()).trim();
+
+      if (meshMode) {
+        const hasMesh = FIELDS.some(f => meshTerms[f].length > 0);
+        if (!hasMesh) {
+          showError("Selecciona al menos un t\u00e9rmino MeSH del desplegable.");
+          return;
+        }
+      }
+
       if (!term) { showError("Introduce al menos un campo PICO."); return; }
 
       const query = {
@@ -279,12 +448,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       saveSearch();
 
-      const cacheKey = hashKey(term, reldate);
+      const cacheKey = hashKey(term, reldate, meshMode ? "mesh" : "free");
       const cached = cacheGet(cacheKey);
       if (cached) {
         report.innerHTML = cached;
         results.classList.remove("hidden");
         showCacheIndicator(true);
+        wireExportButtons([]);
+        wireTableFilters();
         return;
       }
 
@@ -353,12 +524,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const evidenceClass = classifyEvidence(pubRecent, pub10y, trialN);
       const opps = suggestOpps(pubRecent, trialN);
 
+      // MeSH strategy HTML if in MeSH mode
+      const meshStrategyHtml = meshMode ? renderMeshStrategyPanel(meshTerms) : "";
+
       const html = renderResults({
         query, pub10y, pubRecent,
         trials: { n: trialN, statusCounts, phaseCounts },
         evidenceClass, opps, topPubs,
         searchTerm: term, reldate,
-        srMaCount, yearCounts, pubTypeCounts
+        srMaCount, yearCounts, pubTypeCounts,
+        meshStrategyHtml
       });
 
       report.innerHTML = html;
@@ -392,13 +567,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const table = document.getElementById("pubTable");
     if (!container || !table) return;
 
-    // Collect all unique tags
     const allTags = new Set();
     table.querySelectorAll("tbody tr").forEach(tr => {
       (tr.dataset.tags || "").split(",").forEach(t => { if (t) allTags.add(t); });
     });
 
-    // Build filter buttons
     container.innerHTML = '<button class="filter-btn active" data-filter="all">Todos</button>' +
       [...allTags].map(t => `<button class="filter-btn" data-filter="${t}">${t}</button>`).join("");
 
@@ -421,9 +594,16 @@ document.addEventListener("DOMContentLoaded", () => {
   function resetForm() {
     clearError();
     showCacheIndicator(false);
-    FIELDS.forEach(f => { inputs[f].value = ""; synonyms[f] = []; renderChips(f); });
+    FIELDS.forEach(f => {
+      inputs[f].value = "";
+      synonyms[f] = [];
+      renderChips(f);
+      meshTerms[f] = [];
+      renderMeshChips(f);
+    });
     windowSel.value = "7";
     if (exampleSel) exampleSel.value = "";
+    if (meshMode) setMeshMode(false);
     report.innerHTML = "";
     results.classList.add("hidden");
     updateQueryPreview();
@@ -458,4 +638,5 @@ document.addEventListener("DOMContentLoaded", () => {
   restoreSearch();
   updateQueryPreview();
   updateCacheBadge();
+  FIELDS.forEach(f => renderMeshChips(f));
 });

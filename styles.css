@@ -342,6 +342,120 @@ a:hover { text-decoration: underline; }
 /* Export bar */
 .export-bar { display: flex; gap: 8px; margin-top: 12px; }
 
+/* ---------------- MeSH TOGGLE ---------------- */
+.mesh-toggle { display: inline-flex; align-items: center; }
+
+.toggle-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer; font-size: 13px; color: var(--muted);
+  user-select: none;
+}
+.toggle-label input[type="checkbox"] { display: none; }
+
+.toggle-switch {
+  position: relative; width: 36px; height: 20px;
+  background: rgba(255,255,255,0.12); border-radius: 10px;
+  transition: background 0.2s ease; flex-shrink: 0;
+}
+.toggle-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--muted); transition: all 0.2s ease;
+}
+.toggle-label input:checked + .toggle-switch {
+  background: rgba(108,123,255,0.4);
+}
+.toggle-label input:checked + .toggle-switch::after {
+  left: 18px; background: var(--accent);
+}
+
+/* MeSH notice */
+.mesh-notice {
+  margin-top: 10px; padding: 8px 12px; border-radius: 10px;
+  background: rgba(108,123,255,0.1); border: 1px solid rgba(108,123,255,0.25);
+  font-size: 12px; color: var(--accent); line-height: 1.4;
+}
+
+/* Autocomplete dropdown */
+.autocomplete-wrap { position: relative; }
+
+.ac-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+  max-height: 220px; overflow-y: auto;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; margin-top: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.ac-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; cursor: pointer; gap: 8px;
+  transition: background 0.1s ease;
+}
+.ac-item:hover { background: rgba(108,123,255,0.15); }
+.ac-label { font-size: 13px; color: var(--text); }
+.ac-type { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* MeSH chips */
+.mesh-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 6px; min-height: 28px; padding: 4px 0;
+}
+
+.mesh-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 8px; border-radius: 12px; font-size: 12px;
+  background: rgba(178,123,255,0.12); border: 1px solid rgba(178,123,255,0.3);
+  color: var(--text);
+}
+
+.mesh-chip-label { font-weight: 500; }
+.mesh-chip-ui { color: var(--muted); font-size: 10px; margin-right: 2px; }
+
+.mesh-opt {
+  all: unset; cursor: pointer; font-size: 10px; font-weight: 600;
+  padding: 1px 5px; border-radius: 6px;
+  background: rgba(255,255,255,0.06); color: var(--muted);
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: all 0.15s ease;
+}
+.mesh-opt:hover { background: rgba(255,255,255,0.12); }
+.mesh-opt.active {
+  background: rgba(108,123,255,0.25); color: var(--accent);
+  border-color: rgba(108,123,255,0.4);
+}
+
+.mesh-remove {
+  all: unset; cursor: pointer; font-size: 14px; line-height: 1;
+  color: var(--muted); padding: 0 2px;
+}
+.mesh-remove:hover { color: var(--bad); }
+
+/* MeSH strategy panel in results */
+.mesh-strategy-panel {
+  margin-bottom: 12px; padding: 12px 14px; border-radius: 12px;
+  background: rgba(178,123,255,0.06); border: 1px solid rgba(178,123,255,0.2);
+}
+.mesh-strategy-panel h4 { margin: 0 0 8px; font-size: 13px; color: var(--violet); }
+
+.mesh-info-chip {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 3px 8px; border-radius: 10px; font-size: 12px;
+  background: rgba(178,123,255,0.1); border: 1px solid rgba(178,123,255,0.2);
+  color: var(--text);
+}
+.mesh-info-chip small { color: var(--muted); font-size: 10px; }
+
+.mesh-warning {
+  margin: 8px 0 0; font-size: 11px; color: var(--warn);
+  font-style: italic;
+}
+
+/* Form header right alignment */
+.form-header-right {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+
 /* ---------------- UTIL ---------------- */
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
@@ -352,7 +466,14 @@ a:hover { text-decoration: underline; }
 
   /* Hide interactive elements */
   header, .actions, .example-bar, .syn-area, #queryBuilderCard,
-  .loading-box, .error-box, .cache-badge, .export-bar, .table-filters { display: none !important; }
+  .loading-box, .error-box, .cache-badge, .export-bar, .table-filters,
+  .mesh-toggle, .mesh-notice, .mesh-chips, .ac-dropdown { display: none !important; }
+
+  /* MeSH strategy panel */
+  .mesh-strategy-panel { background: #f5f5f5 !important; border: 1px solid #ddd; }
+  .mesh-strategy-panel h4 { color: #333; }
+  .mesh-info-chip { background: #eee !important; border: 1px solid #ccc; color: black; }
+  .mesh-warning { color: #666; }
 
   /* Reset cards */
   .card { box-shadow: none; border: 1px solid #ddd; background: white !important; backdrop-filter: none; }

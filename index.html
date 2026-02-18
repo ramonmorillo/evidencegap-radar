@@ -5,7 +5,7 @@
   <title>EvidenceGap Radar</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:," />
-  <link rel="stylesheet" href="styles.css?v=20260217_2" />
+  <link rel="stylesheet" href="styles.css?v=20260217_5" />
 </head>
 
 <body>
@@ -33,19 +33,37 @@
     <section class="card">
       <div class="form-header">
         <h2>PICO-lite</h2>
-        <div class="example-bar">
-          <label>Ejemplos docentes:</label>
-          <select id="exampleSelector">
-            <option value="">— Seleccionar ejemplo —</option>
-          </select>
+        <div class="form-header-right">
+          <div class="mesh-toggle">
+            <label class="toggle-label">
+              <input type="checkbox" id="meshToggle" />
+              <span class="toggle-switch"></span>
+              <span>MeSH-only (estricto)</span>
+            </label>
+          </div>
+          <div class="example-bar" id="exampleBar">
+            <label>Ejemplos:</label>
+            <select id="exampleSelector">
+              <option value="">— Seleccionar —</option>
+            </select>
+          </div>
         </div>
+      </div>
+
+      <!-- MeSH mode notice -->
+      <div id="meshNotice" class="mesh-notice hidden">
+        Solo términos MeSH. Escribe para buscar en el vocabulario MeSH y selecciona del desplegable.
       </div>
 
       <div class="grid">
         <div class="field">
           <label>Población</label>
-          <input id="population" type="text" placeholder="Ej: pacientes VIH" />
-          <div class="syn-area">
+          <div class="autocomplete-wrap">
+            <input id="population" type="text" placeholder="Ej: pacientes VIH" autocomplete="off" />
+            <div class="ac-dropdown hidden" id="acDrop-population"></div>
+          </div>
+          <div class="mesh-chips hidden" id="meshChips-population"></div>
+          <div class="syn-area" id="synArea-population">
             <div class="syn-chips" id="synChips-population"></div>
             <input class="syn-input" data-field="population" placeholder="+ sinónimo (Enter)" />
           </div>
@@ -53,8 +71,12 @@
 
         <div class="field">
           <label>Intervención / Exposición</label>
-          <input id="intervention" type="text" placeholder="Ej: telefarmacia" autocomplete="off" />
-          <div class="syn-area">
+          <div class="autocomplete-wrap">
+            <input id="intervention" type="text" placeholder="Ej: telefarmacia" autocomplete="off" />
+            <div class="ac-dropdown hidden" id="acDrop-intervention"></div>
+          </div>
+          <div class="mesh-chips hidden" id="meshChips-intervention"></div>
+          <div class="syn-area" id="synArea-intervention">
             <div class="syn-chips" id="synChips-intervention"></div>
             <input class="syn-input" data-field="intervention" placeholder="+ sinónimo (Enter)" />
           </div>
@@ -62,8 +84,12 @@
 
         <div class="field">
           <label>Outcome</label>
-          <input id="outcome" type="text" placeholder="Ej: adherencia" autocomplete="off" />
-          <div class="syn-area">
+          <div class="autocomplete-wrap">
+            <input id="outcome" type="text" placeholder="Ej: adherencia" autocomplete="off" />
+            <div class="ac-dropdown hidden" id="acDrop-outcome"></div>
+          </div>
+          <div class="mesh-chips hidden" id="meshChips-outcome"></div>
+          <div class="syn-area" id="synArea-outcome">
             <div class="syn-chips" id="synChips-outcome"></div>
             <input class="syn-input" data-field="outcome" placeholder="+ sinónimo (Enter)" />
           </div>
@@ -71,8 +97,12 @@
 
         <div class="field">
           <label>Contexto (opcional)</label>
-          <input id="context" type="text" placeholder="Ej: farmacia hospitalaria" />
-          <div class="syn-area">
+          <div class="autocomplete-wrap">
+            <input id="context" type="text" placeholder="Ej: farmacia hospitalaria" autocomplete="off" />
+            <div class="ac-dropdown hidden" id="acDrop-context"></div>
+          </div>
+          <div class="mesh-chips hidden" id="meshChips-context"></div>
+          <div class="syn-area" id="synArea-context">
             <div class="syn-chips" id="synChips-context"></div>
             <input class="syn-input" data-field="context" placeholder="+ sinónimo (Enter)" />
           </div>
@@ -93,25 +123,21 @@
         <button id="print">Imprimir / Guardar PDF</button>
       </div>
 
-      <!-- Loading spinner -->
       <div id="loadingBox" class="loading-box hidden">
         <span class="spinner"></span>
         <span>Consultando PubMed y ClinicalTrials.gov…</span>
       </div>
 
-      <!-- Caja de error -->
       <div id="errorBox" class="error-box hidden"></div>
     </section>
 
     <!-- Query Builder -->
     <section class="card" id="queryBuilderCard">
       <h2>Estrategia de búsqueda</h2>
-
       <div class="strategy-human" id="strategyHuman"></div>
-
       <label class="qb-label">PubMed Query (editable)</label>
       <div class="query-row">
-        <textarea id="queryPreview" rows="3" spellcheck="false" placeholder="La query se genera automáticamente al escribir en los campos PICO…"></textarea>
+        <textarea id="queryPreview" rows="3" spellcheck="false" placeholder="La query se genera automáticamente…"></textarea>
         <button id="copyQuery" class="secondary" type="button" title="Copiar al portapapeles">Copiar</button>
       </div>
     </section>
@@ -127,7 +153,7 @@
 
   </main>
 
-  <script type="module" src="js/app.js?v=20260217_2"></script>
+  <script type="module" src="js/app.js?v=20260217_5"></script>
 
 </body>
 </html>

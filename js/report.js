@@ -3,7 +3,8 @@ import { barChartTimeSeries, hbarChart, quadrantChart, sourcePie } from "./chart
 export function renderResults(data) {
   const {
     query, pub10y, pubRecent, trials, evidenceClass, opps, topPubs,
-    searchTerm, reldate, srMaCount, yearCounts, pubTypeCounts
+    searchTerm, reldate, srMaCount, yearCounts, pubTypeCounts,
+    meshStrategyHtml
   } = data;
 
   const cls = classifyBadge(evidenceClass?.label || "");
@@ -108,9 +109,13 @@ export function renderResults(data) {
     <button class="secondary" id="exportRIS" type="button">Exportar RIS</button>
   </div>`;
 
+  // --- MeSH strategy (if applicable) ---
+  const meshSection = meshStrategyHtml || "";
+
   // --- Assemble dashboard ---
   return `
     ${strategySection}
+    ${meshSection}
     ${picoChips}
 
     <div class="dash-grid">${cardPubmed}${cardTrials}${cardSynthesis}</div>

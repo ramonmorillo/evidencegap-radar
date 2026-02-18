@@ -136,12 +136,28 @@ function esc(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function fetchJson(url, signal) {
-  const resp = await fetch(url, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    signal
+function sleepAbortable(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => { clearTimeout(t); reject(new DOMException("Aborted", "AbortError")); }, { once: true });
   });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  return resp.json();
+}
+
+async function fetchJson(url, signal) {
+  for (let attempt = 0; attempt <= 3; attempt++) {
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal
+    });
+    if (resp.status === 429 && attempt < 3) {
+      console.warn(`MeSH 429 → retry ${attempt + 1}/3`);
+      await sleepAbortable(1000 * Math.pow(2, attempt), signal);
+      continue;
+    }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json();
+  }
+  throw new Error("HTTP 429");
 }

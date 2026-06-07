@@ -403,24 +403,52 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ===================== Classification =====================
 
-  function classifyEvidence(pubRecent, pub10y, trialN) {
-    if (pub10y <= 10 && trialN === 0)
-      return { label: "Hu\u00e9rfano", rationale: "Muy poca evidencia publicada y sin se\u00f1ales de ensayos." };
-    if (pubRecent <= 5 && trialN <= 1)
-      return { label: "Emergente", rationale: "Pocas se\u00f1ales recientes; posible nicho o evidencia incipiente." };
-    if (pubRecent >= 50 && pub10y >= 500)
-      return { label: "Saturado", rationale: "Much\u00edsima publicaci\u00f3n; conviene afinar a subpreguntas." };
-    if (trialN > 0)
-      return { label: "Maduro (activo)", rationale: "Hay ensayos registrados; investigaci\u00f3n en curso." };
-    return { label: "Moderado", rationale: "Evidencia intermedia. Buen terreno para revisar brechas." };
+  // Configurable thresholds \u2014 bump SCHEMA_VERSION in cache.js when changing these.
+  const TH = {
+    masaEscasaPub:     50,   // pub10y below this AND 0 SR/MA \u2192 escasa
+    masaAbundantePub:  300,  // pub10y at or above this \u2192 abundante (regardless of SR/MA)
+    masaAbundanteSrMa: 5,    // srMaCount at or above this \u2192 abundante
+    srMaParaMasa:      1,    // (reserved for future sub-axis)
+    tendenciaSube:     1.2,  // reciente/antiguo ratio above \u2192 creciente
+    tendenciaBaja:     0.8   // reciente/antiguo ratio below \u2192 decreciente
+  };
+
+  function classifyEvidence({ pub10y, srMaCount, trialsActive, yearCounts }) {
+    // --- Eje MASA ---
+    const srMa = srMaCount ?? 0;
+    let masa;
+    if (pub10y < TH.masaEscasaPub && srMa === 0)                              masa = "escasa";
+    else if (pub10y >= TH.masaAbundantePub || srMa >= TH.masaAbundanteSrMa)   masa = "abundante";
+    else                                                                        masa = "moderada";
+
+    // --- Eje TENDENCIA (5 franjas de 365 d, orden: hace5a \u2026 hace1a) ---
+    const vals = (yearCounts || []).map(b => b.value);
+    const reciente = vals.slice(-2).reduce((s, v) => s + v, 0);   // franjas 4a y 5a (m\u00e1s recientes)
+    const antiguo  = vals.slice(0, -2).reduce((s, v) => s + v, 0); // franjas 5a\u20133a (m\u00e1s antiguas)
+    const ratio = reciente / Math.max(1, antiguo);
+    let tendencia;
+    if (ratio > TH.tendenciaSube)     tendencia = "creciente";
+    else if (ratio < TH.tendenciaBaja) tendencia = "decreciente";
+    else                               tendencia = "estable";
+
+    // --- Eje DINAMISMO (trialsActive como binario) ---
+    const dinamismo = (trialsActive >= 1 || tendencia === "creciente") ? "activo" : "latente";
+
+    // --- Matriz de salida ---
+    if (masa === "escasa"    && dinamismo === "latente") return { label: "Hu\u00e9rfano",        rationale: "Evidencia escasa y sin actividad detectable." };
+    if (masa === "escasa"    && dinamismo === "activo")  return { label: "Emergente",        rationale: "Poca evidencia pero con investigaci\u00f3n en marcha." };
+    if (masa === "moderada"  && dinamismo === "activo")  return { label: "Maduro (activo)", rationale: "Cuerpo de evidencia en crecimiento o con ensayos." };
+    if (masa === "moderada"  && dinamismo === "latente") return { label: "En consolidaci\u00f3n", rationale: "Evidencia intermedia, sin se\u00f1ales recientes fuertes." };
+    if (masa === "abundante" && dinamismo === "activo")  return { label: "Maduro (activo)", rationale: "Evidencia amplia y a\u00fan en desarrollo." };
+    return                                                         { label: "Saturado",       rationale: "Mucho publicado y sintetizado; poco margen nuevo." };
   }
 
-  function suggestOpps(pubRecent, trialN) {
+  function suggestOpps(trialsActive, pub10y) {
     const opps = [];
-    if (trialN > 0) opps.push("Hay ensayos activos: mapear outcomes, comparabilidad y brechas.");
-    if (pubRecent === 0) opps.push("Sin se\u00f1ales recientes: probar sin\u00f3nimos/MeSH o reformular.");
-    if (trialN === 0) opps.push("Sin ensayos: valorar piloto/factibilidad.");
-    if (!opps.length) opps.push("Refinar la pregunta: poblaci\u00f3n m\u00e1s concreta, outcome medible.");
+    if (trialsActive > 0) opps.push("Hay ensayos activos: mapear outcomes, comparabilidad y brechas.");
+    if (pub10y === 0)     opps.push("Sin publicaciones: probar sin\u00f3nimos/MeSH o reformular la pregunta.");
+    if (trialsActive === 0) opps.push("Sin ensayos activos: valorar piloto o estudio de factibilidad.");
+    if (!opps.length)     opps.push("Refinar la pregunta: poblaci\u00f3n m\u00e1s concreta, outcome medible.");
     return opps;
   }
 
@@ -586,8 +614,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return (Array.isArray(ph) && ph.length) ? ph.join(",") : "\u2014";
       });
 
-      const evidenceClass = classifyEvidence(pubRecent, pub10y, trialN);
-      const opps = suggestOpps(pubRecent, trialN);
+      const trialsActive = (statusCounts["RECRUITING"] || 0)
+        + (statusCounts["ACTIVE_NOT_RECRUITING"] || 0)
+        + (statusCounts["ENROLLING_BY_INVITATION"] || 0);
+
+      const evidenceClass = classifyEvidence({ pub10y, srMaCount, trialsActive, yearCounts });
+      const opps = suggestOpps(trialsActive, pub10y);
 
       // MeSH strategy HTML if in MeSH mode
       const meshStrategyHtml = meshMode ? renderMeshStrategyPanel(meshTerms) : "";

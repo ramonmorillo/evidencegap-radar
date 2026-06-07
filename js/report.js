@@ -157,10 +157,10 @@ function meterPct(value, cap) {
 function classifyBadge(label) {
   const t = (label || "").toLowerCase();
   if (t.includes("hu\u00e9rfano") || t.includes("huerfano")) return { dot: "bad" };
-  if (t.includes("emergente")) return { dot: "warn" };
-  if (t.includes("saturado")) return { dot: "violet" };
-  if (t.includes("maduro")) return { dot: "ok" };
-  if (t.includes("moderado")) return { dot: "moderate" };
+  if (t.includes("emergente"))                               return { dot: "warn" };
+  if (t.includes("saturado"))                                return { dot: "violet" };
+  if (t.includes("maduro"))                                  return { dot: "ok" };
+  if (t.includes("consolidaci"))                             return { dot: "info" };
   return { dot: "info" };
 }
 

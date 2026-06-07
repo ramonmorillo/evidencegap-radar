@@ -114,6 +114,7 @@ export function renderResults(data) {
   const exportHtml = `<div class="export-bar">
     <button class="secondary" id="exportCSV" type="button">Exportar CSV</button>
     <button class="secondary" id="exportRIS" type="button">Exportar RIS</button>
+    <button class="secondary" id="exportSnapshot" type="button">Descargar instantánea (HTML)</button>
   </div>`;
 
   // --- MeSH strategy (if applicable) ---

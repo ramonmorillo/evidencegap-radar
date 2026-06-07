@@ -60,7 +60,7 @@ function csvEsc(s) {
   return str;
 }
 
-function download(content, filename, mimeType) {
+export function download(content, filename, mimeType) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

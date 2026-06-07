@@ -5,9 +5,11 @@ import { exportCSV, exportRIS } from "./export.js";
 import { EXAMPLES } from "./examples.js";
 import { meshAutocomplete, buildMeshQuery, renderMeshStrategyPanel } from "./mesh.js";
 import { esc } from "./util.js";
+import { encodeState, decodeState, buildCitableSnapshot } from "./share.js";
 
 const PERSIST_KEY = "egr_lastSearch";
 const FIELDS = ["population", "intervention", "outcome", "context"];
+const WINDOW_LABELS = { "7": "7 días", "30": "30 días", "90": "90 días", "365": "1 año", "730": "2 años", "1095": "3 años", "1825": "5 años" };
 const FIELD_LABELS = { population: "P", intervention: "I/E", outcome: "O", context: "Contexto" };
 
 function debounce(fn, ms) {
@@ -47,6 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentController = null;
   let meshAcController = null;
   let _runId = 0;
+  let lastSnapshot = null;
 
   // ===================== UI helpers =====================
 
@@ -476,18 +479,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ===================== Persistence =====================
 
+  function getSearchState() {
+    return {
+      population: inputs.population.value,
+      intervention: inputs.intervention.value,
+      outcome: inputs.outcome.value,
+      context: inputs.context.value,
+      window: windowSel.value,
+      synonyms,
+      meshMode,
+      meshTerms
+    };
+  }
+
+  function applyState(s) {
+    FIELDS.forEach(f => {
+      if (s[f]) inputs[f].value = s[f];
+      if (s.synonyms?.[f]) {
+        synonyms[f] = [...s.synonyms[f]];
+        renderChips(f);
+      }
+      if (s.meshTerms?.[f]) {
+        meshTerms[f] = [...s.meshTerms[f]];
+        renderMeshChips(f);
+      }
+    });
+    if (s.window) windowSel.value = s.window;
+    if (s.meshMode) setMeshMode(true);
+  }
+
   function saveSearch() {
     try {
-      localStorage.setItem(PERSIST_KEY, JSON.stringify({
-        population: inputs.population.value,
-        intervention: inputs.intervention.value,
-        outcome: inputs.outcome.value,
-        context: inputs.context.value,
-        window: windowSel.value,
-        synonyms,
-        meshMode,
-        meshTerms
-      }));
+      localStorage.setItem(PERSIST_KEY, JSON.stringify(getSearchState()));
     } catch { /* ignore */ }
   }
 
@@ -495,20 +518,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const raw = localStorage.getItem(PERSIST_KEY);
       if (!raw) return;
-      const s = JSON.parse(raw);
-      FIELDS.forEach(f => {
-        if (s[f]) inputs[f].value = s[f];
-        if (s.synonyms?.[f]) {
-          synonyms[f] = [...s.synonyms[f]];
-          renderChips(f);
-        }
-        if (s.meshTerms?.[f]) {
-          meshTerms[f] = [...s.meshTerms[f]];
-          renderMeshChips(f);
-        }
-      });
-      if (s.window) windowSel.value = s.window;
-      if (s.meshMode) setMeshMode(true);
+      applyState(JSON.parse(raw));
     } catch { /* ignore */ }
   }
 
@@ -660,6 +670,18 @@ document.addEventListener("DOMContentLoaded", () => {
       cacheSet(cacheKey, html);
       updateCacheBadge();
 
+      // --- Build snapshot (before wiring buttons so the handler has data) ---
+      lastSnapshot = {
+        fechaISO: new Date().toISOString(),
+        fechaLegible: new Date().toLocaleString("es-ES"),
+        estrategiaPubMed: term,
+        ventanaLegible: WINDOW_LABELS[reldate] || `${reldate} días`,
+        modo: meshMode ? "MeSH" : "Libre",
+        pub10y, pubRecent, trialN, trialsActive, srMaCount,
+        clasificacion: evidenceClass,
+        enlaceReproducible: location.origin + location.pathname + "#q=" + encodeState(getSearchState())
+      };
+
       // --- Post-render: wire export buttons & table filters ---
       wireExportButtons(topPubs);
       wireTableFilters();
@@ -675,10 +697,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // ===================== Post-render wiring =====================
 
   function wireExportButtons(pubs) {
-    const btnCSV = document.getElementById("exportCSV");
-    const btnRIS = document.getElementById("exportRIS");
-    if (btnCSV) btnCSV.onclick = () => exportCSV(pubs, "evidencegap_results.csv");
-    if (btnRIS) btnRIS.onclick = () => exportRIS(pubs, "evidencegap_results.ris");
+    const btnCSV  = document.getElementById("exportCSV");
+    const btnRIS  = document.getElementById("exportRIS");
+    const btnSnap = document.getElementById("exportSnapshot");
+    if (btnCSV)  btnCSV.onclick  = () => exportCSV(pubs, "evidencegap_results.csv");
+    if (btnRIS)  btnRIS.onclick  = () => exportRIS(pubs, "evidencegap_results.ris");
+    if (btnSnap) btnSnap.onclick = () => { if (lastSnapshot) buildCitableSnapshot(lastSnapshot); };
   }
 
   function wireTableFilters() {
@@ -737,6 +761,25 @@ document.addEventListener("DOMContentLoaded", () => {
   btnReset.addEventListener("click", resetForm);
   btnPrint.addEventListener("click", () => window.print());
 
+  const btnShare = document.getElementById("shareLink");
+  if (btnShare) {
+    btnShare.addEventListener("click", () => {
+      const url = location.origin + location.pathname + "#q=" + encodeState(getSearchState());
+      const restore = () => { btnShare.textContent = "Copiar enlace"; };
+      navigator.clipboard.writeText(url).then(() => {
+        btnShare.textContent = "Enlace copiado";
+        setTimeout(restore, 2000);
+      }).catch(() => {
+        const ta = document.createElement("textarea");
+        ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select(); document.execCommand("copy");
+        document.body.removeChild(ta);
+        btnShare.textContent = "Enlace copiado";
+        setTimeout(restore, 2000);
+      });
+    });
+  }
+
   FIELDS.forEach(f => {
     inputs[f].addEventListener("keydown", e => {
       if (e.key === "Enter") { e.preventDefault(); debouncedAnalysis(); }
@@ -754,6 +797,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ===================== Init =====================
+  if (location.hash.startsWith("#q=")) {
+    const state = decodeState(location.hash.slice(3));
+    if (state) {
+      applyState(state);
+      updateQueryPreview();
+      updateCacheBadge();
+      FIELDS.forEach(f => renderMeshChips(f));
+      setTimeout(() => runAnalysis(), 50);
+      return; // skip restoreSearch + updateQueryPreview below
+    }
+  }
   restoreSearch();
   updateQueryPreview();
   updateCacheBadge();

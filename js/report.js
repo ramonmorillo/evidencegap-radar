@@ -5,7 +5,7 @@ export function renderResults(data) {
   const {
     query, pub10y, pubRecent, trials, evidenceClass, opps, topPubs,
     searchTerm, reldate, srMaCount, yearCounts, pubTypeCounts,
-    meshStrategyHtml
+    meshStrategyHtml, ctgovError
   } = data;
 
   const cls = classifyBadge(evidenceClass?.label || "");
@@ -50,7 +50,12 @@ export function renderResults(data) {
     </div>
   </div>`;
 
-  const cardTrials = `<div class="dash-card">
+  const cardTrials = ctgovError
+    ? `<div class="dash-card">
+        <h3>ClinicalTrials.gov</h3>
+        <p class="muted" style="font-size:13px;margin:8px 0 0">No se pudieron recuperar ensayos de ClinicalTrials.gov en esta consulta.</p>
+      </div>`
+    : `<div class="dash-card">
     <h3>ClinicalTrials.gov</h3>
     <div class="dash-row">
       <div class="kpi compact"><div class="sub">Total ensayos</div><div class="big">${trials?.n || 0}</div>

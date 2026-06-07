@@ -401,6 +401,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function buildCtgovQuery() {
+    const parts = [];
+    if (meshMode) {
+      for (const f of FIELDS) {
+        const labels = meshTerms[f].map(t => `"${t.label}"`);
+        if (labels.length) parts.push(`(${labels.join(" OR ")})`);
+      }
+    } else {
+      for (const f of FIELDS) {
+        const terms = getAllTerms(f).map(t => `"${t}"`);
+        if (terms.length) parts.push(`(${terms.join(" OR ")})`);
+      }
+    }
+    return parts.join(" AND ");
+  }
+
   // ===================== Classification =====================
 
   // Configurable thresholds \u2014 bump SCHEMA_VERSION in cache.js when changing these.
@@ -553,10 +569,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // --- Parallel batch 1: core data ---
       const enc = encodeURIComponent(term);
+      // CTGov uses Essie syntax — no PubMed field brackets allowed.
+      const ctgovQ = buildCtgovQuery();
       const [esRecent, es10y, ct, esSrMa] = await Promise.all([
         getJson(`/api/pubmed/esearch?term=${enc}&reldate=${encodeURIComponent(reldate)}&retmax=20`, { signal, onRetry }),
         getJson(`/api/pubmed/esearch?term=${enc}&reldate=3650&retmax=0`, { signal, onRetry }),
-        getJson(`/api/ctgov/search?query=${enc}&pageSize=25`, { signal, onRetry }),
+        ctgovQ
+          ? getJson(`/api/ctgov/search?query=${encodeURIComponent(ctgovQ)}&pageSize=25`, { signal, onRetry })
+              .catch(() => ({ studies: [], _ctgovError: true }))
+          : Promise.resolve({ studies: [], _ctgovError: true }),
         getJson(`/api/pubmed/esearch?term=${enc}+AND+(systematic+review[pt]+OR+meta-analysis[pt])&reldate=3650&retmax=0`, { signal, onRetry })
           .catch(() => null)
       ]);
@@ -566,8 +587,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const pub10y = Number(es10y?.esearchresult?.count || 0);
       const srMaCount = esSrMa ? Number(esSrMa?.esearchresult?.count || 0) : null;
 
-      const studies = ct?.studies || ct?.results || [];
-      const trialN = Number(ct?.total || ct?.totalCount || studies.length || 0);
+      const ctgovError = Boolean(ct?._ctgovError);
+      const studies = ctgovError ? [] : (ct?.studies || ct?.results || []);
+      const trialN = ctgovError ? 0 : Number(ct?.total || ct?.totalCount || studies.length || 0);
 
       // --- Batch 2: esummary + year-by-year counts (parallel) ---
       const yearDays = [365, 730, 1095, 1460, 1825];
@@ -630,7 +652,7 @@ document.addEventListener("DOMContentLoaded", () => {
         evidenceClass, opps, topPubs,
         searchTerm: term, reldate,
         srMaCount, yearCounts, pubTypeCounts,
-        meshStrategyHtml
+        meshStrategyHtml, ctgovError
       });
 
       report.innerHTML = html;

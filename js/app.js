@@ -114,6 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const items = await meshAutocomplete(term, meshAcController.signal);
       if (!items.length) { drop.classList.add("hidden"); return; }
 
+      acItems[field] = items;
       drop.innerHTML = items.map((it, i) =>
         `<div class="ac-item" data-idx="${i}"><span class="ac-label">${esc(it.label)}</span><small class="ac-type">${esc(it.type)}</small></div>`
       ).join("");
@@ -133,17 +134,67 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 300);
 
   // Attach autocomplete to inputs (only active in MeSH mode)
+  // acItems holds the last resolved suggestions per field for keyboard selection.
+  const acItems = {};
+
   FIELDS.forEach(f => {
+    let acActiveIdx = -1;
+
+    function acHighlight(drop) {
+      drop.querySelectorAll(".ac-item").forEach((el, i) => {
+        el.classList.toggle("ac-active", i === acActiveIdx);
+      });
+    }
+
+    function acReset(drop) {
+      acActiveIdx = -1;
+      drop?.querySelectorAll(".ac-item").forEach(el => el.classList.remove("ac-active"));
+    }
+
     inputs[f].addEventListener("input", () => {
       if (!meshMode) return;
+      acActiveIdx = -1;
       debouncedMeshAc(f, inputs[f].value.trim());
+    });
+
+    inputs[f].addEventListener("keydown", e => {
+      const drop = $(`acDrop-${f}`);
+      const isOpen = drop && !drop.classList.contains("hidden");
+
+      if (e.key === "ArrowDown") {
+        if (!isOpen) return;
+        e.preventDefault();
+        const count = drop.querySelectorAll(".ac-item").length;
+        acActiveIdx = Math.min(acActiveIdx + 1, count - 1);
+        acHighlight(drop);
+      } else if (e.key === "ArrowUp") {
+        if (!isOpen) return;
+        e.preventDefault();
+        acActiveIdx = Math.max(acActiveIdx - 1, 0);
+        acHighlight(drop);
+      } else if (e.key === "Enter") {
+        if (isOpen && acActiveIdx >= 0 && acItems[f]?.[acActiveIdx]) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          addMeshTerm(f, acItems[f][acActiveIdx]);
+          drop.classList.add("hidden");
+          acReset(drop);
+          inputs[f].value = "";
+        }
+      } else if (e.key === "Escape") {
+        if (isOpen) {
+          e.preventDefault();
+          drop.classList.add("hidden");
+          acReset(drop);
+        }
+      }
     });
 
     // Close dropdown on blur (with slight delay for click)
     inputs[f].addEventListener("blur", () => {
       setTimeout(() => {
         const drop = $(`acDrop-${f}`);
-        if (drop) drop.classList.add("hidden");
+        if (drop) { drop.classList.add("hidden"); acReset(drop); }
       }, 200);
     });
   });

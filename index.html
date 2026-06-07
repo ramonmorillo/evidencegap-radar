@@ -55,7 +55,7 @@
 
       <div class="grid">
         <div class="field">
-          <label>Población</label>
+          <label for="population">Población</label>
           <div class="autocomplete-wrap">
             <input id="population" type="text" placeholder="Ej: pacientes VIH" autocomplete="off" />
             <div class="ac-dropdown hidden" id="acDrop-population"></div>
@@ -68,7 +68,7 @@
         </div>
 
         <div class="field">
-          <label>Intervención / Exposición</label>
+          <label for="intervention">Intervención / Exposición</label>
           <div class="autocomplete-wrap">
             <input id="intervention" type="text" placeholder="Ej: telefarmacia" autocomplete="off" />
             <div class="ac-dropdown hidden" id="acDrop-intervention"></div>
@@ -81,7 +81,7 @@
         </div>
 
         <div class="field">
-          <label>Outcome</label>
+          <label for="outcome">Outcome</label>
           <div class="autocomplete-wrap">
             <input id="outcome" type="text" placeholder="Ej: adherencia" autocomplete="off" />
             <div class="ac-dropdown hidden" id="acDrop-outcome"></div>
@@ -94,7 +94,7 @@
         </div>
 
         <div class="field">
-          <label>Contexto (opcional)</label>
+          <label for="context">Contexto (opcional)</label>
           <div class="autocomplete-wrap">
             <input id="context" type="text" placeholder="Ej: farmacia hospitalaria" autocomplete="off" />
             <div class="ac-dropdown hidden" id="acDrop-context"></div>
@@ -108,7 +108,7 @@
       </div>
 
       <div class="actions">
-        <select id="window">
+        <select id="window" aria-label="Ventana de búsqueda">
           <option value="7">7 días</option>
           <option value="30">30 días</option>
           <option value="90">90 días</option>
@@ -121,12 +121,12 @@
         <button id="print">Imprimir / Guardar PDF</button>
       </div>
 
-      <div id="loadingBox" class="loading-box hidden">
+      <div id="loadingBox" class="loading-box hidden" aria-live="polite">
         <span class="spinner"></span>
         <span>Consultando PubMed y ClinicalTrials.gov…</span>
       </div>
 
-      <div id="errorBox" class="error-box hidden"></div>
+      <div id="errorBox" class="error-box hidden" role="alert"></div>
     </section>
 
     <!-- Query Builder -->

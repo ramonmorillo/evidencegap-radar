@@ -1,14 +1,15 @@
 import { barChartTimeSeries, hbarChart, quadrantChart, sourcePie } from "./charts.js";
+import { esc } from "./util.js";
 
 export function renderResults(data) {
   const {
     query, pub10y, pubRecent, trials, evidenceClass, opps, topPubs,
     searchTerm, reldate, srMaCount, yearCounts, pubTypeCounts,
-    meshStrategyHtml
+    meshStrategyHtml, ctgovError
   } = data;
 
   const cls = classifyBadge(evidenceClass?.label || "");
-  const windowLabel = { "7": "7 d\u00edas", "30": "30 d\u00edas", "90": "90 d\u00edas", "365": "1 a\u00f1o" }[reldate] || `${reldate} d\u00edas`;
+  const windowLabel = { "7": "7 d\u00edas", "30": "30 d\u00edas", "90": "90 d\u00edas", "365": "1 a\u00f1o", "730": "2 a\u00f1os", "1095": "3 a\u00f1os", "1825": "5 a\u00f1os" }[reldate] || `${reldate} d\u00edas`;
   const timestamp = new Date().toLocaleString("es-ES");
 
   // Count active trials
@@ -49,7 +50,12 @@ export function renderResults(data) {
     </div>
   </div>`;
 
-  const cardTrials = `<div class="dash-card">
+  const cardTrials = ctgovError
+    ? `<div class="dash-card">
+        <h3>ClinicalTrials.gov</h3>
+        <p class="muted" style="font-size:13px;margin:8px 0 0">No se pudieron recuperar ensayos de ClinicalTrials.gov en esta consulta.</p>
+      </div>`
+    : `<div class="dash-card">
     <h3>ClinicalTrials.gov</h3>
     <div class="dash-row">
       <div class="kpi compact"><div class="sub">Total ensayos</div><div class="big">${trials?.n || 0}</div>
@@ -76,7 +82,8 @@ export function renderResults(data) {
   </div>`;
 
   // --- Charts ---
-  const timeChart = barChartTimeSeries(yearCounts, "Publicaciones por a\u00f1o (aprox.)");
+  const timeChartInner = barChartTimeSeries(yearCounts, "Publicaciones (ventanas m\u00f3viles de 12 meses)");
+  const timeChart = `<div class="chart-with-note">${timeChartInner}<p class="chart-note">Cada franja cubre 365 d\u00edas derivados de <code>reldate</code> (EDAT). Son aproximaciones, no recuentos por fecha de publicaci\u00f3n del art\u00edculo. El recuento de la ventana seleccionada (${esc(windowLabel)}) se muestra en la tarjeta PubMed.</p></div>`;
 
   const pubTypeChart = hbarChart(pubTypeCounts || {}, "Tipos de publicaci\u00f3n (muestra)");
 
@@ -142,10 +149,6 @@ function formatCounts(obj) {
   return entries.sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k}: ${v}`).join(" \u00b7 ");
 }
 
-function esc(s) {
-  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 function chip(label, value) {
   const v = String(value || "").trim();
   if (!v) return "";
@@ -159,9 +162,10 @@ function meterPct(value, cap) {
 function classifyBadge(label) {
   const t = (label || "").toLowerCase();
   if (t.includes("hu\u00e9rfano") || t.includes("huerfano")) return { dot: "bad" };
-  if (t.includes("emergente")) return { dot: "warn" };
-  if (t.includes("saturado")) return { dot: "violet" };
-  if (t.includes("maduro")) return { dot: "ok" };
+  if (t.includes("emergente"))                               return { dot: "warn" };
+  if (t.includes("saturado"))                                return { dot: "violet" };
+  if (t.includes("maduro"))                                  return { dot: "ok" };
+  if (t.includes("consolidaci"))                             return { dot: "info" };
   return { dot: "info" };
 }
 
@@ -193,7 +197,7 @@ function buildPubTable(pubs) {
     const year = (p.pubdate || "").split(" ")[0] || "";
     const tags = classifyPubType(p.pubtype);
     const tagHtml = tags.map(t => `<span class="pub-tag ${pubTagClass(t)}">${t}</span>`).join("");
-    return `<tr data-tags="${tags.join(",")}"">
+    return `<tr data-tags="${tags.join(",")}"
       <td><a href="https://pubmed.ncbi.nlm.nih.gov/${id}/" target="_blank" rel="noreferrer">${title}</a></td>
       <td>${esc(year)}</td>
       <td>${journal}</td>

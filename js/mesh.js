@@ -1,5 +1,6 @@
 // js/mesh.js — MeSH resolution, autocomplete, and query building
 // Uses NLM MeSH Lookup API (CORS-enabled public API)
+import { esc } from "./util.js";
 
 const MESH_API = "https://id.nlm.nih.gov/mesh/lookup";
 const MESH_CACHE_PREFIX = "egr_mesh_";
@@ -130,10 +131,6 @@ function setMeshCache(key, data) {
   try {
     localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
   } catch { /* ignore */ }
-}
-
-function esc(s) {
-  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function sleepAbortable(ms, signal) {

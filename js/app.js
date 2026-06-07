@@ -4,6 +4,7 @@ import { hashKey, cacheGet, cacheSet, cacheClear, cacheCount } from "./cache.js"
 import { exportCSV, exportRIS } from "./export.js";
 import { EXAMPLES } from "./examples.js";
 import { meshAutocomplete, buildMeshQuery, renderMeshStrategyPanel } from "./mesh.js";
+import { esc } from "./util.js";
 
 const PERSIST_KEY = "egr_lastSearch";
 const FIELDS = ["population", "intervention", "outcome", "context"];
@@ -12,10 +13,6 @@ const FIELD_LABELS = { population: "P", intervention: "I/E", outcome: "O", conte
 function debounce(fn, ms) {
   let timer;
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
-}
-
-function esc(s) {
-  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 // ===================== App =====================
@@ -117,6 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const items = await meshAutocomplete(term, meshAcController.signal);
       if (!items.length) { drop.classList.add("hidden"); return; }
 
+      acItems[field] = items;
       drop.innerHTML = items.map((it, i) =>
         `<div class="ac-item" data-idx="${i}"><span class="ac-label">${esc(it.label)}</span><small class="ac-type">${esc(it.type)}</small></div>`
       ).join("");
@@ -136,17 +134,67 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 300);
 
   // Attach autocomplete to inputs (only active in MeSH mode)
+  // acItems holds the last resolved suggestions per field for keyboard selection.
+  const acItems = {};
+
   FIELDS.forEach(f => {
+    let acActiveIdx = -1;
+
+    function acHighlight(drop) {
+      drop.querySelectorAll(".ac-item").forEach((el, i) => {
+        el.classList.toggle("ac-active", i === acActiveIdx);
+      });
+    }
+
+    function acReset(drop) {
+      acActiveIdx = -1;
+      drop?.querySelectorAll(".ac-item").forEach(el => el.classList.remove("ac-active"));
+    }
+
     inputs[f].addEventListener("input", () => {
       if (!meshMode) return;
+      acActiveIdx = -1;
       debouncedMeshAc(f, inputs[f].value.trim());
+    });
+
+    inputs[f].addEventListener("keydown", e => {
+      const drop = $(`acDrop-${f}`);
+      const isOpen = drop && !drop.classList.contains("hidden");
+
+      if (e.key === "ArrowDown") {
+        if (!isOpen) return;
+        e.preventDefault();
+        const count = drop.querySelectorAll(".ac-item").length;
+        acActiveIdx = Math.min(acActiveIdx + 1, count - 1);
+        acHighlight(drop);
+      } else if (e.key === "ArrowUp") {
+        if (!isOpen) return;
+        e.preventDefault();
+        acActiveIdx = Math.max(acActiveIdx - 1, 0);
+        acHighlight(drop);
+      } else if (e.key === "Enter") {
+        if (isOpen && acActiveIdx >= 0 && acItems[f]?.[acActiveIdx]) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          addMeshTerm(f, acItems[f][acActiveIdx]);
+          drop.classList.add("hidden");
+          acReset(drop);
+          inputs[f].value = "";
+        }
+      } else if (e.key === "Escape") {
+        if (isOpen) {
+          e.preventDefault();
+          drop.classList.add("hidden");
+          acReset(drop);
+        }
+      }
     });
 
     // Close dropdown on blur (with slight delay for click)
     inputs[f].addEventListener("blur", () => {
       setTimeout(() => {
         const drop = $(`acDrop-${f}`);
-        if (drop) drop.classList.add("hidden");
+        if (drop) { drop.classList.add("hidden"); acReset(drop); }
       }, 200);
     });
   });
@@ -353,26 +401,70 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ===================== Classification =====================
-
-  function classifyEvidence(pubRecent, pub10y, trialN) {
-    if (pub10y <= 10 && trialN === 0)
-      return { label: "Hu\u00e9rfano", rationale: "Muy poca evidencia publicada y sin se\u00f1ales de ensayos." };
-    if (pubRecent <= 5 && trialN <= 1)
-      return { label: "Emergente", rationale: "Pocas se\u00f1ales recientes; posible nicho o evidencia incipiente." };
-    if (pubRecent >= 50 && pub10y >= 500)
-      return { label: "Saturado", rationale: "Much\u00edsima publicaci\u00f3n; conviene afinar a subpreguntas." };
-    if (trialN > 0)
-      return { label: "Maduro (activo)", rationale: "Hay ensayos registrados; investigaci\u00f3n en curso." };
-    return { label: "Moderado", rationale: "Evidencia intermedia. Buen terreno para revisar brechas." };
+  function buildCtgovQuery() {
+    const parts = [];
+    if (meshMode) {
+      for (const f of FIELDS) {
+        const labels = meshTerms[f].map(t => `"${t.label}"`);
+        if (labels.length) parts.push(`(${labels.join(" OR ")})`);
+      }
+    } else {
+      for (const f of FIELDS) {
+        const terms = getAllTerms(f).map(t => `"${t}"`);
+        if (terms.length) parts.push(`(${terms.join(" OR ")})`);
+      }
+    }
+    return parts.join(" AND ");
   }
 
-  function suggestOpps(pubRecent, trialN) {
+  // ===================== Classification =====================
+
+  // Configurable thresholds \u2014 bump SCHEMA_VERSION in cache.js when changing these.
+  const TH = {
+    masaEscasaPub:     50,   // pub10y below this AND 0 SR/MA \u2192 escasa
+    masaAbundantePub:  300,  // pub10y at or above this \u2192 abundante (regardless of SR/MA)
+    masaAbundanteSrMa: 5,    // srMaCount at or above this \u2192 abundante
+    srMaParaMasa:      1,    // (reserved for future sub-axis)
+    tendenciaSube:     1.2,  // reciente/antiguo ratio above \u2192 creciente
+    tendenciaBaja:     0.8   // reciente/antiguo ratio below \u2192 decreciente
+  };
+
+  function classifyEvidence({ pub10y, srMaCount, trialsActive, yearCounts }) {
+    // --- Eje MASA ---
+    const srMa = srMaCount ?? 0;
+    let masa;
+    if (pub10y < TH.masaEscasaPub && srMa === 0)                              masa = "escasa";
+    else if (pub10y >= TH.masaAbundantePub || srMa >= TH.masaAbundanteSrMa)   masa = "abundante";
+    else                                                                        masa = "moderada";
+
+    // --- Eje TENDENCIA (5 franjas de 365 d, orden: hace5a \u2026 hace1a) ---
+    const vals = (yearCounts || []).map(b => b.value);
+    const reciente = vals.slice(-2).reduce((s, v) => s + v, 0);   // franjas 4a y 5a (m\u00e1s recientes)
+    const antiguo  = vals.slice(0, -2).reduce((s, v) => s + v, 0); // franjas 5a\u20133a (m\u00e1s antiguas)
+    const ratio = reciente / Math.max(1, antiguo);
+    let tendencia;
+    if (ratio > TH.tendenciaSube)     tendencia = "creciente";
+    else if (ratio < TH.tendenciaBaja) tendencia = "decreciente";
+    else                               tendencia = "estable";
+
+    // --- Eje DINAMISMO (trialsActive como binario) ---
+    const dinamismo = (trialsActive >= 1 || tendencia === "creciente") ? "activo" : "latente";
+
+    // --- Matriz de salida ---
+    if (masa === "escasa"    && dinamismo === "latente") return { label: "Hu\u00e9rfano",        rationale: "Evidencia escasa y sin actividad detectable." };
+    if (masa === "escasa"    && dinamismo === "activo")  return { label: "Emergente",        rationale: "Poca evidencia pero con investigaci\u00f3n en marcha." };
+    if (masa === "moderada"  && dinamismo === "activo")  return { label: "Maduro (activo)", rationale: "Cuerpo de evidencia en crecimiento o con ensayos." };
+    if (masa === "moderada"  && dinamismo === "latente") return { label: "En consolidaci\u00f3n", rationale: "Evidencia intermedia, sin se\u00f1ales recientes fuertes." };
+    if (masa === "abundante" && dinamismo === "activo")  return { label: "Maduro (activo)", rationale: "Evidencia amplia y a\u00fan en desarrollo." };
+    return                                                         { label: "Saturado",       rationale: "Mucho publicado y sintetizado; poco margen nuevo." };
+  }
+
+  function suggestOpps(trialsActive, pub10y) {
     const opps = [];
-    if (trialN > 0) opps.push("Hay ensayos activos: mapear outcomes, comparabilidad y brechas.");
-    if (pubRecent === 0) opps.push("Sin se\u00f1ales recientes: probar sin\u00f3nimos/MeSH o reformular.");
-    if (trialN === 0) opps.push("Sin ensayos: valorar piloto/factibilidad.");
-    if (!opps.length) opps.push("Refinar la pregunta: poblaci\u00f3n m\u00e1s concreta, outcome medible.");
+    if (trialsActive > 0) opps.push("Hay ensayos activos: mapear outcomes, comparabilidad y brechas.");
+    if (pub10y === 0)     opps.push("Sin publicaciones: probar sin\u00f3nimos/MeSH o reformular la pregunta.");
+    if (trialsActive === 0) opps.push("Sin ensayos activos: valorar piloto o estudio de factibilidad.");
+    if (!opps.length)     opps.push("Refinar la pregunta: poblaci\u00f3n m\u00e1s concreta, outcome medible.");
     return opps;
   }
 
@@ -477,10 +569,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // --- Parallel batch 1: core data ---
       const enc = encodeURIComponent(term);
+      // CTGov uses Essie syntax — no PubMed field brackets allowed.
+      const ctgovQ = buildCtgovQuery();
       const [esRecent, es10y, ct, esSrMa] = await Promise.all([
         getJson(`/api/pubmed/esearch?term=${enc}&reldate=${encodeURIComponent(reldate)}&retmax=20`, { signal, onRetry }),
         getJson(`/api/pubmed/esearch?term=${enc}&reldate=3650&retmax=0`, { signal, onRetry }),
-        getJson(`/api/ctgov/search?query=${enc}&pageSize=25`, { signal, onRetry }),
+        ctgovQ
+          ? getJson(`/api/ctgov/search?query=${encodeURIComponent(ctgovQ)}&pageSize=25`, { signal, onRetry })
+              .catch(() => ({ studies: [], _ctgovError: true }))
+          : Promise.resolve({ studies: [], _ctgovError: true }),
         getJson(`/api/pubmed/esearch?term=${enc}+AND+(systematic+review[pt]+OR+meta-analysis[pt])&reldate=3650&retmax=0`, { signal, onRetry })
           .catch(() => null)
       ]);
@@ -490,8 +587,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const pub10y = Number(es10y?.esearchresult?.count || 0);
       const srMaCount = esSrMa ? Number(esSrMa?.esearchresult?.count || 0) : null;
 
-      const studies = ct?.studies || ct?.results || [];
-      const trialN = Number(ct?.total || ct?.totalCount || studies.length || 0);
+      const ctgovError = Boolean(ct?._ctgovError);
+      const studies = ctgovError ? [] : (ct?.studies || ct?.results || []);
+      const trialN = ctgovError ? 0 : Number(ct?.total || ct?.totalCount || studies.length || 0);
 
       // --- Batch 2: esummary + year-by-year counts (parallel) ---
       const yearDays = [365, 730, 1095, 1460, 1825];
@@ -513,15 +611,14 @@ document.addEventListener("DOMContentLoaded", () => {
         topPubs = uids.map(uid => esum.result[uid]).filter(Boolean);
       }
 
-      // Build year-by-year data (derive per-year from cumulative)
-      const now = new Date().getFullYear();
+      // Build rolling-window data (derive per-365d band from cumulative reldate counts).
+      // Labels are relative ("hace Xa") because these are 365-day windows, not calendar years.
       const yearCounts = [];
       for (let i = yCounts.length - 1; i >= 0; i--) {
         const prev = i > 0 ? yCounts[i - 1] : 0;
         const perYear = Math.max(0, yCounts[i] - prev);
-        yearCounts.push({ label: String(now - (i + 1)), value: perYear });
+        yearCounts.push({ label: "hace " + (i + 1) + "a", value: perYear });
       }
-      yearCounts.push({ label: String(now), value: pubRecent });
 
       // Extract publication types from topPubs
       const pubTypeCounts = {};
@@ -539,8 +636,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return (Array.isArray(ph) && ph.length) ? ph.join(",") : "\u2014";
       });
 
-      const evidenceClass = classifyEvidence(pubRecent, pub10y, trialN);
-      const opps = suggestOpps(pubRecent, trialN);
+      const trialsActive = (statusCounts["RECRUITING"] || 0)
+        + (statusCounts["ACTIVE_NOT_RECRUITING"] || 0)
+        + (statusCounts["ENROLLING_BY_INVITATION"] || 0);
+
+      const evidenceClass = classifyEvidence({ pub10y, srMaCount, trialsActive, yearCounts });
+      const opps = suggestOpps(trialsActive, pub10y);
 
       // MeSH strategy HTML if in MeSH mode
       const meshStrategyHtml = meshMode ? renderMeshStrategyPanel(meshTerms) : "";
@@ -551,7 +652,7 @@ document.addEventListener("DOMContentLoaded", () => {
         evidenceClass, opps, topPubs,
         searchTerm: term, reldate,
         srMaCount, yearCounts, pubTypeCounts,
-        meshStrategyHtml
+        meshStrategyHtml, ctgovError
       });
 
       report.innerHTML = html;

@@ -2,13 +2,14 @@
 
 const CACHE_PREFIX = "egr_cache_";
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutos
+const SCHEMA_VERSION = "1";
 
 /**
  * Hash simple (djb2) para generar claves de caché a partir de strings.
  * No es criptográfico, solo necesitamos una clave determinista y corta.
  */
 export function hashKey(...parts) {
-  const str = parts.join("|");
+  const str = SCHEMA_VERSION + "|" + parts.join("|");
   let h = 5381;
   for (let i = 0; i < str.length; i++) {
     h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;

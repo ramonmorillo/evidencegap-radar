@@ -1,8 +1,5 @@
 // js/charts.js — Gráficos CSS/SVG puros (sin dependencias)
-
-function esc(s) {
-  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+import { esc } from "./util.js";
 
 /**
  * Bar chart vertical (CSS) para serie temporal de publicaciones.

@@ -13,6 +13,7 @@
   --bad: #ff5c6c;
   --info: #5cb8ff;
   --violet: #b27bff;
+  --moderate: #7aaed6;
 }
 
 /* ---------------- BASE ---------------- */
@@ -233,6 +234,7 @@ button.secondary:hover { background: rgba(255,255,255,0.16); }
 .dot.bad { background: var(--bad); }
 .dot.info { background: var(--info); }
 .dot.violet { background: var(--violet); }
+.dot.moderate { background: var(--moderate); }
 
 /* ---------------- CHIPS ---------------- */
 .chips { margin: 10px 0 16px; display: flex; flex-wrap: wrap; gap: 8px; }
@@ -274,6 +276,8 @@ a:hover { text-decoration: underline; }
   padding: 16px; border: 1px solid var(--border);
 }
 .chart-card h4 { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.chart-with-note { display: contents; }
+.chart-note { margin: 8px 16px 0; font-size: 11px; color: var(--muted); line-height: 1.4; }
 
 /* Bar chart (vertical) */
 .bar-chart {
@@ -403,7 +407,7 @@ a:hover { text-decoration: underline; }
   padding: 8px 12px; cursor: pointer; gap: 8px;
   transition: background 0.1s ease;
 }
-.ac-item:hover { background: rgba(108,123,255,0.15); }
+.ac-item:hover, .ac-item.ac-active { background: rgba(108,123,255,0.15); }
 .ac-label { font-size: 13px; color: var(--text); }
 .ac-type { font-size: 11px; color: var(--muted); white-space: nowrap; }
 

@@ -14,7 +14,12 @@ function apiBase() {
 function classifyError(err, url) {
   const msg = (err?.message || "").toLowerCase();
 
-  // Timeout (AbortController o fetch timeout)
+  // Timeout interno (no cancelación de usuario)
+  if (msg === "timeout") {
+    return "La petición tardó demasiado (timeout). Reintenta o simplifica la búsqueda.";
+  }
+
+  // Cancelación explícita por el usuario
   if (err?.name === "AbortError") {
     return "Búsqueda cancelada (se lanzó una nueva o se agotó el tiempo).";
   }
@@ -36,11 +41,6 @@ function classifyError(err, url) {
   }
   if (msg.includes("http 4")) {
     return `Error en la petición (${err.message}). Revisa los términos de búsqueda.`;
-  }
-
-  // Timeout genérico
-  if (msg.includes("timeout")) {
-    return "La petición tardó demasiado (timeout). Reintenta o simplifica la búsqueda.";
   }
 
   // Genérico
@@ -69,20 +69,28 @@ function sleep(ms, signal) {
  * @param {object} opts
  * @param {AbortSignal} [opts.signal] — Señal de AbortController para cancelar
  * @param {Function} [opts.onRetry] — Callback (attempt, maxRetries, delayMs) llamado antes de cada reintento
+ * @param {number} [opts.timeout=15000] — Timeout por intento en ms
  * @returns {Promise<any>}
  */
-export async function getJson(path, { signal, onRetry } = {}) {
+export async function getJson(path, { signal, onRetry, timeout = 15000 } = {}) {
   const base = apiBase();
   const url = (base ? base.replace(/\/$/, "") : "") + path;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const timeoutCtrl = new AbortController();
+    const timeoutId = setTimeout(() => timeoutCtrl.abort(), timeout);
+    const combined = signal
+      ? AbortSignal.any([signal, timeoutCtrl.signal])
+      : timeoutCtrl.signal;
+
     try {
       const resp = await fetch(url, {
         method: "GET",
         credentials: "omit",
         headers: { "Accept": "application/json" },
-        signal
+        signal: combined
       });
+      clearTimeout(timeoutId);
 
       // Retry on 429 with exponential backoff
       if (resp.status === 429 && attempt < MAX_RETRIES) {
@@ -102,7 +110,16 @@ export async function getJson(path, { signal, onRetry } = {}) {
 
       return await resp.json();
     } catch (e) {
-      if (e?.name === "AbortError") throw e;
+      clearTimeout(timeoutId);
+      if (e?.name === "AbortError") {
+        // Internal timeout fired and the external signal was not the cause
+        if (timeoutCtrl.signal.aborted && !signal?.aborted) {
+          const te = new Error("timeout");
+          te._userMessage = classifyError(te, url);
+          throw te;
+        }
+        throw e; // user-initiated cancellation — propagate as-is
+      }
       console.error("API ERROR →", url, e);
       e._userMessage = classifyError(e, url);
       throw e;

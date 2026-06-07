@@ -510,15 +510,14 @@ document.addEventListener("DOMContentLoaded", () => {
         topPubs = uids.map(uid => esum.result[uid]).filter(Boolean);
       }
 
-      // Build year-by-year data (derive per-year from cumulative)
-      const now = new Date().getFullYear();
+      // Build rolling-window data (derive per-365d band from cumulative reldate counts).
+      // Labels are relative ("hace Xa") because these are 365-day windows, not calendar years.
       const yearCounts = [];
       for (let i = yCounts.length - 1; i >= 0; i--) {
         const prev = i > 0 ? yCounts[i - 1] : 0;
         const perYear = Math.max(0, yCounts[i] - prev);
-        yearCounts.push({ label: String(now - (i + 1)), value: perYear });
+        yearCounts.push({ label: "hace " + (i + 1) + "a", value: perYear });
       }
-      yearCounts.push({ label: String(now), value: pubRecent });
 
       // Extract publication types from topPubs
       const pubTypeCounts = {};

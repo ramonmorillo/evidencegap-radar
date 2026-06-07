@@ -77,7 +77,8 @@ export function renderResults(data) {
   </div>`;
 
   // --- Charts ---
-  const timeChart = barChartTimeSeries(yearCounts, "Publicaciones por a\u00f1o (aprox.)");
+  const timeChartInner = barChartTimeSeries(yearCounts, "Publicaciones (ventanas m\u00f3viles de 12 meses)");
+  const timeChart = `<div class="chart-with-note">${timeChartInner}<p class="chart-note">Cada franja cubre 365 d\u00edas derivados de <code>reldate</code> (EDAT). Son aproximaciones, no recuentos por fecha de publicaci\u00f3n del art\u00edculo. El recuento de la ventana seleccionada (${esc(windowLabel)}) se muestra en la tarjeta PubMed.</p></div>`;
 
   const pubTypeChart = hbarChart(pubTypeCounts || {}, "Tipos de publicaci\u00f3n (muestra)");
 

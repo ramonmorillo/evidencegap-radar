@@ -276,6 +276,8 @@ a:hover { text-decoration: underline; }
   padding: 16px; border: 1px solid var(--border);
 }
 .chart-card h4 { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.chart-with-note { display: contents; }
+.chart-note { margin: 8px 16px 0; font-size: 11px; color: var(--muted); line-height: 1.4; }
 
 /* Bar chart (vertical) */
 .bar-chart {

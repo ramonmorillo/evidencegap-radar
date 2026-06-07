@@ -9,7 +9,7 @@ export function renderResults(data) {
   } = data;
 
   const cls = classifyBadge(evidenceClass?.label || "");
-  const windowLabel = { "7": "7 d\u00edas", "30": "30 d\u00edas", "90": "90 d\u00edas", "365": "1 a\u00f1o" }[reldate] || `${reldate} d\u00edas`;
+  const windowLabel = { "7": "7 d\u00edas", "30": "30 d\u00edas", "90": "90 d\u00edas", "365": "1 a\u00f1o", "730": "2 a\u00f1os", "1095": "3 a\u00f1os", "1825": "5 a\u00f1os" }[reldate] || `${reldate} d\u00edas`;
   const timestamp = new Date().toLocaleString("es-ES");
 
   // Count active trials

@@ -1,4 +1,5 @@
 import { barChartTimeSeries, hbarChart, quadrantChart, sourcePie } from "./charts.js";
+import { esc } from "./util.js";
 
 export function renderResults(data) {
   const {
@@ -140,10 +141,6 @@ function formatCounts(obj) {
   const entries = Object.entries(obj || {});
   if (!entries.length) return "\u2014";
   return entries.sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k}: ${v}`).join(" \u00b7 ");
-}
-
-function esc(s) {
-  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function chip(label, value) {

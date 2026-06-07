@@ -4,6 +4,7 @@ import { hashKey, cacheGet, cacheSet, cacheClear, cacheCount } from "./cache.js"
 import { exportCSV, exportRIS } from "./export.js";
 import { EXAMPLES } from "./examples.js";
 import { meshAutocomplete, buildMeshQuery, renderMeshStrategyPanel } from "./mesh.js";
+import { esc } from "./util.js";
 
 const PERSIST_KEY = "egr_lastSearch";
 const FIELDS = ["population", "intervention", "outcome", "context"];
@@ -12,10 +13,6 @@ const FIELD_LABELS = { population: "P", intervention: "I/E", outcome: "O", conte
 function debounce(fn, ms) {
   let timer;
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
-}
-
-function esc(s) {
-  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 // ===================== App =====================

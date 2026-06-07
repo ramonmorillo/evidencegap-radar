@@ -162,6 +162,7 @@ function classifyBadge(label) {
   if (t.includes("emergente")) return { dot: "warn" };
   if (t.includes("saturado")) return { dot: "violet" };
   if (t.includes("maduro")) return { dot: "ok" };
+  if (t.includes("moderado")) return { dot: "moderate" };
   return { dot: "info" };
 }
 
@@ -193,7 +194,7 @@ function buildPubTable(pubs) {
     const year = (p.pubdate || "").split(" ")[0] || "";
     const tags = classifyPubType(p.pubtype);
     const tagHtml = tags.map(t => `<span class="pub-tag ${pubTagClass(t)}">${t}</span>`).join("");
-    return `<tr data-tags="${tags.join(",")}"">
+    return `<tr data-tags="${tags.join(",")}"
       <td><a href="https://pubmed.ncbi.nlm.nih.gov/${id}/" target="_blank" rel="noreferrer">${title}</a></td>
       <td>${esc(year)}</td>
       <td>${journal}</td>

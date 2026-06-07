@@ -13,6 +13,7 @@
   --bad: #ff5c6c;
   --info: #5cb8ff;
   --violet: #b27bff;
+  --moderate: #7aaed6;
 }
 
 /* ---------------- BASE ---------------- */
@@ -233,6 +234,7 @@ button.secondary:hover { background: rgba(255,255,255,0.16); }
 .dot.bad { background: var(--bad); }
 .dot.info { background: var(--info); }
 .dot.violet { background: var(--violet); }
+.dot.moderate { background: var(--moderate); }
 
 /* ---------------- CHIPS ---------------- */
 .chips { margin: 10px 0 16px; display: flex; flex-wrap: wrap; gap: 8px; }

@@ -1,8 +1,17 @@
 {
   "_comentario": "Opcional. Enlace oficial de cada PDF en sanidad.gob.es. Si url es null, CIPM Finder enlaza la copia local de fuentes/.",
   "documentos": [
-    { "archivo": "Acuerdos_CIPM_271.pdf", "url": null },
-    { "archivo": "Nota_informativa_CIPM_Julio_2026.pdf", "url": null },
-    { "archivo": "Nota_informativa_CIPM_Septiembre_2026.pdf", "url": null }
+    {
+      "archivo": "Acuerdos_CIPM_271.pdf",
+      "url": "https://www.sanidad.gob.es/areas/farmacia/precios/comisionInteministerial/acuerdosNotasInformativas/docs/Acuerdos_CIPM_271.pdf"
+    },
+    {
+      "archivo": "Nota_informativa_CIPM_Julio_2026.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Nota_informativa_CIPM_Septiembre_2026.pdf",
+      "url": null
+    }
   ]
 }

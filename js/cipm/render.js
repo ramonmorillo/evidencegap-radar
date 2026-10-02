@@ -35,7 +35,10 @@ function docLink(r) {
   const pTxt = r.pagina ? ` (p. ${r.pagina})` : "";
   // #page=N lo interpretan la mayoría de visores PDF de navegador
   if (r.url) {
-    return `<a href="${esc(r.url + page)}" target="_blank" rel="noopener noreferrer">Abrir documento oficial${pTxt}</a>`;
+    const local = r.archivo
+      ? `<small class="cipm-muted"> · <a href="${esc(r.archivo + page)}" target="_blank" rel="noopener">copia local</a></small>`
+      : "";
+    return `<a href="${esc(r.url + page)}" target="_blank" rel="noopener noreferrer">Abrir documento oficial${pTxt}</a>${local}`;
   }
   if (r.archivo) {
     return `<a href="${esc(r.archivo + page)}" target="_blank" rel="noopener">Abrir PDF${pTxt}</a>

@@ -1,0 +1,585 @@
+#!/usr/bin/env python3
+"""
+CIPM Finder — extracción de registros desde los PDF oficiales de la CIPM.
+
+Lee los PDF guardados en fuentes/ y regenera data/cipm.json.
+
+  * "Acuerdos CIPM <n>"            → fuente principal. Un registro por EXPEDIENTE
+                                     (cada "i) Nombre®" del documento).
+  * "Nota informativa CIPM <mes>"  → fuente complementaria, PROVISIONAL.
+                                     Un registro por medicamento citado.
+
+Criterios:
+  * Texto literal: bloque, apartado, indicación y acuerdo se copian del PDF
+    (solo se unen líneas y se eliminan cabeceras/pies de página).
+  * No se extrae el precio.
+  * Validación: los expedientes extraídos deben coincidir con el índice del
+    propio PDF (nombre y página). Si no coinciden, el script termina con error
+    y no escribe el JSON.
+
+Requisitos: Python 3.9+ y `pdftotext` (poppler-utils).
+
+Uso:
+  python3 scripts/cipm_extract.py            # extrae y escribe data/cipm.json
+  python3 scripts/cipm_extract.py --check    # solo valida, no escribe
+"""
+
+import difflib
+import json
+import re
+import shutil
+import subprocess
+import sys
+import unicodedata
+from datetime import date
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+FUENTES = ROOT / "fuentes"
+MANIFEST = FUENTES / "fuentes.json"
+OUT = ROOT / "data" / "cipm.json"
+
+SCHEMA_VERSION = 2
+MAX_TEXT = 4000  # caracteres por campo de texto largo; si se supera se marca como truncado
+
+MESES = {m: i + 1 for i, m in enumerate(
+    "enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre".split())}
+
+# Cabeceras/pies de página que se repiten en todas las páginas
+HEADER_RE = re.compile(
+    r"^(SECRETAR[IÍ]A DE ESTADO( DE)?( SANIDAD)?|MINISTERIO( DE SANIDAD)?|DE SANIDAD|SANIDAD|"
+    r"COMISI[OÓ]N INTERMINISTERIAL DE|PRECIOS DE LOS MEDICAMENTOS|-?\d{1,3}-?)$")
+
+
+class ExtractionError(Exception):
+    pass
+
+
+# ----------------------------------------------------------------- utilidades
+
+def pdf_pages(path):
+    """Texto por página (modo layout para conservar columnas de las tablas)."""
+    res = subprocess.run(["pdftotext", "-layout", str(path), "-"],
+                         capture_output=True, text=True, check=True)
+    pages = res.stdout.split("\f")
+    if pages and not pages[-1].strip():
+        pages.pop()
+    return pages
+
+
+def clean_lines(pages):
+    """[(página, línea)] sin cabeceras ni números de página."""
+    out = []
+    for pno, page in enumerate(pages, 1):
+        for line in page.split("\n"):
+            # Una línea de cabecera puede juntar varios rótulos en columnas
+            chunks = [c for c in re.split(r"\s{2,}", line.strip()) if c]
+            if chunks and all(HEADER_RE.match(re.sub(r"\s+", " ", c)) for c in chunks):
+                continue
+            out.append((pno, line.rstrip()))
+    return out
+
+
+def paragraphs(lines):
+    """Une líneas en párrafos (separados por líneas en blanco o viñetas)."""
+    paras, cur = [], []
+    for line in lines:
+        s = line.strip()
+        if not s or s.startswith("•") or re.match(r"^o\s", s):
+            if cur:
+                paras.append(" ".join(cur))
+            cur = [] if not s else [s]
+            continue
+        cur.append(s)
+    if cur:
+        paras.append(" ".join(cur))
+    paras = [re.sub(r"\s+", " ", p).strip() for p in paras if p.strip()]
+    # Reunir párrafos partidos por un salto de página (continúa en minúscula)
+    merged = []
+    for p in paras:
+        if merged and not re.search(r"[.:;]$", merged[-1]) and re.match(r"^[a-záéíóúñ(]", p):
+            merged[-1] += " " + p
+        else:
+            merged.append(p)
+    return merged
+
+
+def cap(text):
+    if text and len(text) > MAX_TEXT:
+        return text[:MAX_TEXT].rstrip() + " […]", True
+    return text, False
+
+
+def slug(s):
+    s = unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+
+
+def fecha_es(d, mes, y):
+    m = MESES.get(mes.lower())
+    if not m:
+        raise ExtractionError(f"Mes no reconocido: {mes}")
+    return f"{int(y):04d}-{m:02d}-{int(d):02d}"
+
+
+def load_manifest():
+    if MANIFEST.exists():
+        data = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        return {e["archivo"]: e for e in data.get("documentos", [])}
+    return {}
+
+
+# ------------------------------------------------------------ Acuerdos CIPM
+
+ROMAN = r"[ivxl]+"
+TOC_RE = re.compile(rf"^({ROMAN})\)\s*(.+?)\s*\.{{3,}}\s*(\d+)$")
+EXP_RE = re.compile(rf"^({ROMAN})\)\s*(.+?)\s*\.{{5,}}\s*\d*$")
+# Numeración del bloque: "1)", "2)" o, en algún documento, "2.2" (CIPM 260)
+BLOQUE_RE = re.compile(r"^(\d(?:\)|\.\d\.?))\s*(Acuerdos.*?)\s*(\.{3,}\s*\d+)?$")
+APARTADO_RE = re.compile(r"^([a-d])\)\s+([A-ZÁÉÍÓÚ][^.]*?)\.?\s*(\.{3,}\s*\d+)?$")
+
+
+def parse_toc(lines):
+    """Índice: lista de (bloque, apartado, nombre, página)."""
+    toc, bloque, apartado, started = [], None, None, False
+    for _, line in lines:
+        s = line.strip()
+        if s == "Contenido":
+            started = True
+            continue
+        if not started:
+            continue
+        if not re.search(r"\.{3,}\s*\d+$", s):
+            # El índice puede continuar tras un salto de página: solo termina
+            # cuando aparece texto que no es línea de índice (inicio del cuerpo)
+            if toc and s:
+                break
+            continue
+        if m := BLOQUE_RE.match(s):
+            bloque = m[2].strip()
+        elif m := APARTADO_RE.match(s):
+            apartado = m[2].strip()
+        elif m := TOC_RE.match(s):
+            toc.append((bloque, apartado, clean_name(m[2]), int(m[3])))
+    return toc
+
+
+def norm_key(s):
+    """Clave de comparación: sin acentos, minúsculas, sin puntuación."""
+    s = unicodedata.normalize("NFD", s or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+
+def collapse_repeats(text):
+    """'NOVARTIS SA NOVARTIS SA NOVARTIS' → 'NOVARTIS SA' (un laboratorio repetido
+    en cada fila de la tabla). Si no es una repetición exacta, devuelve el texto."""
+    if not text:
+        return text
+    toks = text.split()
+    for p in range(1, len(toks) // 2 + 1):
+        unit = toks[:p]
+        if all(toks[i] == unit[i % p] for i in range(len(toks))):
+            return " ".join(unit)
+    return text
+
+
+def clean_name(s):
+    return re.sub(r"\s+", " ", s.replace("®", "")).strip()
+
+
+def table_column(header, word):
+    i = header.find(word)
+    return i if i >= 0 else None
+
+
+def parse_table(tlines):
+    """Laboratorio y CN de la tabla del expediente (sin precio)."""
+    # La cabecera puede ocupar varias líneas ("MEDICAMENTO" en otra fila que "LABORATORIO")
+    # "LABORAT" también cubre cabeceras partidas ("LABORATOR / IO", CIPM 260)
+    header_idx = next((i for i, l in enumerate(tlines) if "LABORAT" in l), None)
+    if header_idx is None:  # tablas sin columna de laboratorio (p. ej. Jivi, CIPM 266)
+        header_idx = next((i for i, l in enumerate(tlines) if "MEDICAMENTO" in l), None)
+    cns, lab_parts = [], []
+    if header_idx is None:
+        return None, cns
+    near = tlines[max(0, header_idx - 2):header_idx + 3]
+    med_line = next((l for l in near if "MEDICAMENTO" in l), None)
+    med_col = table_column(med_line, "MEDICAMENTO") if med_line else None
+    header_idx = max(header_idx, tlines.index(med_line) if med_line else header_idx)
+    for line in tlines[header_idx + 1:]:
+        # Código nacional: 6 dígitos aislados (los precios llevan coma decimal)
+        cns += re.findall(r"(?<![\d,.])(\d{6})(?![\d,])", line)
+        m = re.match(r"^(\s*)(\S.*?)(?=\s{2,}|$)", line)
+        if m and med_col is not None:
+            start, chunk = len(m[1]), m[2]
+            # "IO": resto de una cabecera partida ("LABORATOR / IO", CIPM 260)
+            if chunk.strip() in ("IO", "RIO", "ORIO"):
+                continue
+            if start < med_col - 5 and start + len(chunk) < med_col + 2 and not re.fullmatch(r"[\d.,\s]+", chunk):
+                lab_parts.append(chunk.strip())
+    lab = re.sub(r"\s+", " ", " ".join(lab_parts)).strip() or None
+    return lab, list(dict.fromkeys(cns))
+
+
+SECTION_RE = {
+    "indicacion": re.compile(r"^Indicaci(ón|ones) terap[ée]utica(s)?( autorizada(s)?( y financiada(s)?)?)?\s*(:|$)", re.I),
+    "indicacionFinanciada": re.compile(r"^Indicaci(ón|ones) terap[ée]utica(s)? financiada(s)?\s*(:|$)", re.I),
+    "indicacionObjeto": re.compile(r"^Indicaci(ón|ones)( terap[ée]utica(s)?)? objeto\b[^:]*(:|$)", re.I),
+    "condiciones": re.compile(r"^Condiciones de prescripci[oó]n", re.I),
+    # "Con respecto a este medicamento…", "…a estos medicamentos…", "…a la presentación…"
+    # (tolera erratas del original, p. ej. "Con respecto, de este medicamento" en CIPM 263)
+    "acuerdo": re.compile(r"^Con respecto\b", re.I),
+}
+
+
+def split_sections(body):
+    """Divide el texto (tras la tabla) en secciones por sus rótulos literales."""
+    sections, cur = {"_pre": []}, "_pre"
+    for line in body:
+        s = line.strip()
+        for key, rx in SECTION_RE.items():
+            if rx.match(s) and (key != "acuerdo" or "acuerdo" not in sections):
+                cur = key
+                sections.setdefault(cur, [])
+                if key.startswith("indicacion"):
+                    s = s.split(":", 1)[1].strip() if ":" in s else ""
+                break
+        sections[cur].append(s if s != line.strip() else line)
+    return sections
+
+
+def first_decision(acuerdo_paras):
+    """Primera frase del acuerdo; si termina en 'acuerda:', se añade la primera viñeta."""
+    if not acuerdo_paras:
+        return None
+    first = acuerdo_paras[0]
+    if first.rstrip().endswith(":") and len(acuerdo_paras) > 1:
+        bullet = acuerdo_paras[1].lstrip("• ").strip()
+        return f"{first} {bullet}"
+    # Fin de frase: punto tras minúscula/dígito/paréntesis seguido de mayúscula o fin
+    # (evita cortar en abreviaturas como "C.N." o "S.L.")
+    m = re.match(r"(.+?[a-záéíóúñ0-9)]\.)(?=\s+[A-ZÁÉÍÓÚ]|\s*$)", first)
+    return m[1] if m else first
+
+
+def parse_acuerdos(path, pages, manifest_entry):
+    full = "\n".join(pages)
+    m = re.search(r"Sesi[oó]n\s+(\d+)\s+de\s+(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})", full)
+    if not m:
+        raise ExtractionError(f"{path.name}: no se encuentra 'Sesión N de D de MES de AAAA'")
+    cipm, fecha = m[1], fecha_es(m[2], m[3], m[4])
+    lines = clean_lines(pages)
+    toc = parse_toc(lines)
+    if not toc:
+        raise ExtractionError(f"{path.name}: no se encuentra el índice ('Contenido')")
+
+    # Cuerpo: a partir de la 2.ª aparición del primer bloque (la 1.ª es el índice)
+    starts = [i for i, (_, l) in enumerate(lines)
+              if (mb0 := BLOQUE_RE.match(l.strip())) and norm_key(mb0[2]).startswith("acuerdos de precio")]
+    if len(starts) < 2:
+        raise ExtractionError(f"{path.name}: no se localiza el inicio del cuerpo")
+    bloque = apartado = None
+    exps, cur = [], None
+    for pno, line in lines[starts[1]:]:
+        s = line.strip()
+        if (mb := BLOQUE_RE.match(s)) and not EXP_RE.match(s):
+            bloque, apartado, cur = mb[2].strip(), None, None
+            continue
+        if (ma := APARTADO_RE.match(s)) and len(s) < 60:
+            apartado, cur = ma[2].strip(), None
+            continue
+        if me := EXP_RE.match(s):
+            cur = {"roman": me[1], "nombre": clean_name(me[2]), "pagina": pno,
+                   "bloque": bloque, "apartado": apartado, "lines": []}
+            exps.append(cur)
+            continue
+        if cur is not None:
+            cur["lines"].append(line)
+
+    # Validación contra el índice: mismo número de expedientes, misma posición,
+    # bloque/apartado y página idénticos (salvo formato). En el nombre se toleran
+    # erratas leves del propio documento (p. ej. "Omyclo" en el índice y
+    # "Omlyclo" en el cuerpo del CIPM 257): se registran como aviso y se usa el
+    # nombre del cuerpo del expediente.
+    warnings = []
+    got = [(e["bloque"], e["apartado"], e["nombre"], e["pagina"]) for e in exps]
+    problems = []
+    if len(got) != len(toc):
+        problems.append(f"  {len(got)} extraídos / {len(toc)} en índice")
+    for t, g in zip(toc, got):
+        same_section = norm_key(t[0]) == norm_key(g[0]) and norm_key(t[1]) == norm_key(g[1])
+        sim = difflib.SequenceMatcher(None, norm_key(t[2]), norm_key(g[2])).ratio()
+        if not same_section or t[3] != g[3] or sim < 0.75:
+            problems.append(f"  índice: {t}\n  extraído: {g}")
+        elif sim < 1:
+            warnings.append(f"nombre distinto en índice ('{t[2]}') y cuerpo ('{g[2]}'), p. {g[3]}; se usa el del cuerpo")
+    # Comprobación independiente de los bloques: cada línea del texto bruto que
+    # empiece por "Acuerdos …" con puntos de índice debe corresponder a un bloque
+    # detectado (evita asignar expedientes al bloque equivocado si cambia la numeración).
+    # Un encabezado seguido directamente de otro (p. ej. "1) Acuerdos de Precio…"
+    # → "2.1 Acuerdos favorables", CIPM 261-262) es un contenedor sin expedientes.
+    toc_lines = [l.strip() for _, l in lines if re.search(r"\.{3,}\s*\d+$", l.strip())]
+    is_block = [bool(re.match(r"^[\d.)\s]*Acuerdos\b", t)) for t in toc_lines]
+    raw_blocks = [norm_key(re.sub(r"\.{3,}\s*\d+$", "", re.sub(r"^[\d.)\s]+", "", t)))
+                  for i, t in enumerate(toc_lines)
+                  if is_block[i] and not (i + 1 < len(toc_lines) and is_block[i + 1])]
+    toc_blocks = list(dict.fromkeys(norm_key(t[0]) for t in toc))
+    if raw_blocks != toc_blocks:
+        problems.append(f"  bloques en el índice {raw_blocks} ≠ bloques asignados {toc_blocks}")
+    if problems:
+        raise ExtractionError(
+            f"{path.name}: los expedientes no coinciden con el índice\n" + "\n".join(problems[:10]))
+
+    url = (manifest_entry or {}).get("url")
+    records = []
+    bloque_n = {}
+    for e in exps:
+        text = e["lines"]
+        pa_idx = next((i for i, l in enumerate(text) if l.strip().startswith("Principio activo:")), None)
+        if pa_idx is None:
+            warnings.append(f"{e['nombre']}: sin línea 'Principio activo'")
+            table, body, atc, pa = text, [], None, None
+        else:
+            table, body = text[:pa_idx], text[pa_idx + 1:]
+            pa_line = re.sub(r"\s+", " ", text[pa_idx].split(":", 1)[1]).strip().rstrip(".")
+            pa_line = re.sub(r"^[-–]\s*", "", pa_line)  # "- L04AC22 - Espesolimab" (CIPM 260-263)
+            ATC = r"[A-Z]\d{2}(?:[A-Z]{1,2}\d{0,2})?"
+            mpa = re.match(rf"^({ATC})\s*[-–]?\s*(.*)$", pa_line)
+            mpb = re.match(rf"^(.*?)\s*[-–]\s*({ATC})$", pa_line)  # orden invertido: "nombre – ATC"
+            if mpa:
+                atc, pa = mpa[1], mpa[2].strip() or None
+            elif mpb:
+                atc, pa = mpb[2], mpb[1].strip() or None
+            else:
+                atc, pa = None, pa_line
+        lab, cns = parse_table(table)
+        lab = collapse_repeats(lab)
+        # Tablas muy fragmentadas mezclan columnas: mejor sin dato que un dato erróneo
+        if lab and (len(lab) > 80 or norm_key(e["nombre"]).split()[0] in norm_key(lab).split()):
+            warnings.append(f"{e['nombre']}: laboratorio no extraíble de forma fiable (tabla fragmentada); se deja vacío")
+            lab = None
+        # Algunos expedientes incluyen más de una tabla (otras presentaciones)
+        for k, l in enumerate(body):
+            if "LABORAT" in l:
+                end = next((j for j in range(k + 1, len(body)) if body[j].strip().startswith("Principio activo:")), len(body))
+                _, extra = parse_table(body[k:end])
+                cns += [c for c in extra if c not in cns]
+        if not cns:
+            warnings.append(f"{e['nombre']}: sin código nacional en la tabla")
+        sec = split_sections(body)
+        acuerdo_p = paragraphs(sec.get("acuerdo", []))
+        indic, t1 = cap("\n".join(paragraphs(sec.get("indicacion", []))) or None)
+        indic_f, t2 = cap("\n".join(paragraphs(sec.get("indicacionFinanciada", []))) or None)
+        indic_o, t4 = cap("\n".join(paragraphs(sec.get("indicacionObjeto", []))) or None)
+        acuerdo, t3 = cap("\n".join(acuerdo_p) or None)
+        cond = " ".join(paragraphs(sec.get("condiciones", [])))
+        cond = re.sub(r"^Condiciones de prescripci[oó]n y dispensaci[oó]n:\s*", "", cond) or None
+        if not acuerdo:
+            warnings.append(f"{e['nombre']}: sin texto 'Con respecto a… la Comisión acuerda'")
+        bloque_n.setdefault(e["bloque"], len(bloque_n) + 1)
+        records.append({
+            "id": f"cipm{cipm}-{bloque_n[e['bloque']]}{slug(e['apartado'] or 'x')[:12]}-{e['roman']}-{slug(e['nombre'])}",
+            "demo": False,
+            "fuente": "acuerdos",
+            "provisional": False,
+            "cipm": cipm,
+            "fecha": fecha,
+            "bloque": e["bloque"],
+            "apartado": e["apartado"],
+            "tipo": f"{e['bloque']} · {e['apartado']}",
+            "nombreComercial": e["nombre"],
+            "principioActivo": pa,
+            "atc": atc,
+            "laboratorio": lab,
+            "codigoNacional": cns,
+            "indicacion": indic,
+            "indicacionFinanciada": indic_f,
+            "indicacionObjeto": indic_o,
+            "condiciones": cond,
+            "decision": first_decision(acuerdo_p),
+            "acuerdo": acuerdo,
+            "truncado": t1 or t2 or t3 or t4,
+            "pagina": e["pagina"],
+            "archivo": f"fuentes/{path.name}",
+            "url": url,
+        })
+    summary = {"archivo": path.name, "tipo": "acuerdos", "cipm": cipm, "fecha": fecha,
+               "paginas": len(pages), "registros": len(records), "url": url}
+    return records, summary, warnings
+
+
+# ------------------------------------------------------- Notas informativas
+
+NOTA_ITEM_RE = re.compile(r"([A-ZÁÉÍÓÚ][\w\-]+(?:\s[A-Z][\w\-]+)*)\s*(H\*)?\s*\(([^)]+)\)")
+NOTA_PROSA_RE = re.compile(
+    r"^((?:Adicionalmente, )?se ha acordado la financiaci[oó]n de la extensi[oó]n de indicaci[oó]n de)\s+"
+    r"(.+?)\s+para\s+(.+)$", re.I)
+
+
+def parse_nota(path, pages, manifest_entry):
+    full = re.sub(r"\s+", " ", " ".join(pages))
+    m = re.search(r"Precios de los Medicamentos\s+(\d{1,2}) de (\w+) de (\d{4})", full)
+    if not m:
+        raise ExtractionError(f"{path.name}: no se encuentra la fecha de la reunión")
+    fecha = fecha_es(m[1], m[2], m[3])
+    url = (manifest_entry or {}).get("url")
+    records, warnings, section = [], [], None
+    seq = 0
+
+    def add(nc, orphan, pa, ind, pno, apartado):
+        nonlocal seq
+        seq += 1
+        ind, t = cap(ind or None)
+        records.append({
+            "id": f"nota{fecha}-{seq:02d}-{slug(nc)}",
+            "demo": False, "fuente": "nota", "provisional": True,
+            "cipm": None, "fecha": fecha,
+            "bloque": "Nota informativa", "apartado": apartado,
+            "tipo": f"Nota informativa · {apartado}",
+            "nombreComercial": nc, "principioActivo": pa, "atc": None, "laboratorio": None,
+            "codigoNacional": [], "huerfano": orphan,
+            "indicacion": ind, "indicacionFinanciada": None, "indicacionObjeto": None, "condiciones": None,
+            "decision": apartado, "acuerdo": None, "truncado": t,
+            "pagina": pno, "archivo": f"fuentes/{path.name}", "url": url,
+        })
+
+    for pno, page in enumerate(pages, 1):
+        lines = [l for _, l in clean_lines([page])]
+        # bloques: viñeta "•" abre bloque; sub-viñetas "o" se mantienen dentro
+        blocks, cur = [], None
+        for line in lines:
+            s = line.strip()
+            if not s:
+                if cur:
+                    blocks.append(cur)
+                cur = None
+                continue
+            if s.startswith("•"):
+                if cur:
+                    blocks.append(cur)
+                cur = ["b", s[1:].strip()]
+            elif cur and cur[0] == "b" and re.match(r"^o\s", s):
+                cur[1] += "\n" + s[1:].strip()
+            elif cur:
+                cur[1] += " " + s
+            else:
+                cur = ["p", s]
+        if cur:
+            blocks.append(cur)
+        for kind, b in blocks:
+            b = re.sub(r"[ \t]+", " ", b).strip()
+            if kind == "p":
+                if b.startswith("Información importante"):
+                    section = None
+                elif b.endswith(":"):
+                    section = b[:-1].strip()
+                elif mp := NOTA_PROSA_RE.match(b):
+                    for nc, orph, pa in NOTA_ITEM_RE.findall(mp[2]):
+                        add(nc, bool(orph), pa, mp[3].rstrip("."), pno, mp[1])
+                continue
+            if section is None:
+                continue
+            head, _, ind = b.partition(":")
+            items = NOTA_ITEM_RE.findall(head)
+            if not items:
+                warnings.append(f"p.{pno}: viñeta no reconocida: {b[:80]}")
+                continue
+            ind = "\n".join(x.strip() for x in ind.strip().split("\n") if x.strip())
+            for nc, orph, pa in items:
+                add(nc, bool(orph), pa.strip(), ind, pno, section)
+
+    # Validación orientativa con las cifras del primer párrafo
+    mn = re.search(r"financiaci[oó]n total o parcial de (\d+) nuevos? medicamentos?", full)
+    if mn:
+        n_new = sum(1 for r in records if re.match(r"Los? nuevos? medicamentos?", r["apartado"] or ""))
+        if n_new != int(mn[1]):
+            warnings.append(f"nuevos medicamentos: la nota dice {mn[1]}, extraídos {n_new}")
+    mi = re.search(r"(\d+) nuevas? indicaci[oó]n(?:es)? de (\d+) medicamentos?", full)
+    if mi:
+        n_ind = sum(1 for r in records if re.match(r"Las? nuevas? indicaci", r["apartado"] or ""))
+        if n_ind != int(mi[2]):
+            warnings.append(f"nuevas indicaciones: la nota dice {mi[2]} medicamentos, extraídos {n_ind}")
+
+    summary = {"archivo": path.name, "tipo": "nota", "cipm": None, "fecha": fecha,
+               "paginas": len(pages), "registros": len(records), "url": url}
+    return records, summary, warnings
+
+
+# ------------------------------------------------------------------- main
+
+def detect(pages):
+    head = re.sub(r"\s+", " ", " ".join(pages[:2])).upper()
+    if "ACUERDOS DE LA COMISION INTERMINISTERIAL" in head or "ACUERDOS DE LA COMISIÓN INTERMINISTERIAL" in head:
+        return "acuerdos"
+    if "PUNTOS DESTACADOS DE LA REUNI" in head:
+        return "nota"
+    return None
+
+
+def main(argv):
+    check_only = "--check" in argv
+    if not shutil.which("pdftotext"):
+        sys.exit("ERROR: falta 'pdftotext' (paquete poppler-utils).")
+    pdfs = sorted(FUENTES.glob("*.pdf"))
+    if not pdfs:
+        sys.exit(f"ERROR: no hay PDF en {FUENTES}")
+    manifest = load_manifest()
+    all_records, docs, errors = [], [], []
+    for pdf in pdfs:
+        pages = pdf_pages(pdf)
+        kind = detect(pages)
+        try:
+            if kind == "acuerdos":
+                recs, summ, warns = parse_acuerdos(pdf, pages, manifest.get(pdf.name))
+            elif kind == "nota":
+                recs, summ, warns = parse_nota(pdf, pages, manifest.get(pdf.name))
+            else:
+                raise ExtractionError(f"{pdf.name}: tipo de documento no reconocido")
+        except ExtractionError as e:
+            errors.append(str(e))
+            print(f"✗ {e}", file=sys.stderr)
+            continue
+        summ["avisos"] = warns
+        docs.append(summ)
+        all_records += recs
+        flag = "⚠" if warns else "✓"
+        print(f"{flag} {pdf.name}: {summ['tipo']} · {summ['fecha']} · {len(recs)} registros")
+        for w in warns:
+            print(f"    aviso: {w}")
+
+    if errors:
+        sys.exit(f"\n{len(errors)} documento(s) con errores. No se escribe {OUT.relative_to(ROOT)}.")
+
+    ids = [r["id"] for r in all_records]
+    dup = {i for i in ids if ids.count(i) > 1}
+    if dup:
+        sys.exit(f"ERROR: identificadores duplicados: {sorted(dup)}")
+
+    all_records.sort(key=lambda r: (r["fecha"], r["cipm"] or "", -r["pagina"]), reverse=True)
+    docs.sort(key=lambda d: d["fecha"], reverse=True)
+    out = {
+        "meta": {
+            "schemaVersion": SCHEMA_VERSION,
+            "dataset": "cipm",
+            "isDemo": False,
+            "updated": date.today().isoformat(),
+            "generator": "scripts/cipm_extract.py",
+            "granularidad": "Acuerdos CIPM: un registro por expediente (cada 'i) Nombre®' del documento). "
+                            "Notas informativas: un registro por medicamento citado.",
+            "criterioTexto": "bloque, apartado, indicación y acuerdo se transcriben literalmente del PDF; "
+                             "solo se unen líneas y se eliminan cabeceras y pies de página.",
+            "exclusiones": "No se extrae el precio.",
+            "documentos": docs,
+        },
+        "records": all_records,
+    }
+    print(f"\nTotal: {len(all_records)} registros de {len(docs)} documento(s).")
+    if check_only:
+        print("--check: validación correcta, no se escribe el JSON.")
+        return
+    OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(f"Escrito {OUT.relative_to(ROOT)} ({OUT.stat().st_size // 1024} KB)")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

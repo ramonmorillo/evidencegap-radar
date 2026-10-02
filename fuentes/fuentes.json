@@ -1,0 +1,89 @@
+{
+  "_comentario": "Opcional. Enlace oficial de cada PDF en sanidad.gob.es. Si url es null, CIPM Finder enlaza la copia local de fuentes/.",
+  "documentos": [
+    {
+      "archivo": "Acuerdos_CIPM_253.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_254.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_255.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_256.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_257.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_258.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_259.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_260.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_261.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_262.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_263.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_264.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_265.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_266.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_267.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_268.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_269.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_270.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Acuerdos_CIPM_271.pdf",
+      "url": "https://www.sanidad.gob.es/areas/farmacia/precios/comisionInteministerial/acuerdosNotasInformativas/docs/Acuerdos_CIPM_271.pdf"
+    },
+    {
+      "archivo": "Nota_informativa_CIPM_Julio_2026.pdf",
+      "url": null
+    },
+    {
+      "archivo": "Nota_informativa_CIPM_Septiembre_2026.pdf",
+      "url": null
+    }
+  ]
+}

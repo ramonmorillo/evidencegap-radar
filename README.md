@@ -117,35 +117,35 @@ Módulo independiente para buscar apariciones de un medicamento en los acuerdos 
 
 - **Navegación**: pestañas `EvidenceGap Radar | CIPM Finder` (`js/tabs.js`). El hash `#cipm` abre directamente CIPM Finder; los enlaces reproducibles de Radar (`#q=...`) siguen funcionando igual.
 - **Carga diferida**: el módulo y su base de datos solo se cargan al abrir la pestaña por primera vez.
-- **Búsqueda**: por principio activo, nombre comercial o código nacional; insensible a mayúsculas/acentos; varios términos se combinan con AND; el CN admite puntos o espacios (`000.001`).
+- **Búsqueda**: por principio activo, nombre comercial, código nacional o código ATC; insensible a mayúsculas/acentos; varios términos se combinan con AND; el CN admite puntos o espacios (`000.001`).
 - **Resultados**: orden cronológico (más reciente primero por defecto), filtro por tipo de acuerdo (generado a partir de los datos) y ficha desplegable con todos los campos.
 
 ### Base de datos local: `data/cipm.json`
 
-```json
-{
-  "meta": { "schemaVersion": 1, "isDemo": true, "updated": "AAAA-MM-DD", "source": "...", "notes": "..." },
-  "records": [
-    {
-      "id": "único", "demo": false,
-      "cipm": "271", "fecha": "AAAA-MM-DD",
-      "principioActivo": "...", "nombreComercial": "...",
-      "codigoNacional": ["000000"],
-      "tipo": "...", "indicacion": "...", "decision": "...", "extracto": "...",
-      "pagina": 10, "url": "https://..."
-    }
-  ]
-}
-```
+**Se genera automáticamente** con `scripts/cipm_extract.py` a partir de los PDF oficiales guardados en `fuentes/`. No se edita a mano.
 
-- **Granularidad**: un registro por **medicamento y acuerdo CIPM**. Varias presentaciones del mismo medicamento en el mismo acuerdo se agrupan en `codigoNacional` (lista).
-- **Texto literal**: `tipo`, `indicacion` y `decision` se transcriben tal cual del acuerdo publicado, sin recodificar. El filtro por tipo agrupa solo variantes de formato (mayúsculas, acentos, espacios, punto final) y muestra la primera forma literal encontrada.
-- `codigoNacional` acepta texto o lista.
-- Campos ausentes → `null` (la interfaz muestra «No disponible»).
-- `url` solo se enlaza si empieza por `http(s)://`; si hay `pagina` se añade `#page=N`.
-- Registros con `demo: true` (o `meta.isDemo: true`) se marcan visiblemente como **«Datos de demostración»**.
+| Fuente | Unidad de registro | Carácter |
+|---|---|---|
+| `Acuerdos CIPM <n>` (fuente principal) | Un registro por **expediente** (cada «i) Nombre®» del documento) | Acuerdos de la sesión (incluye denegatorios) |
+| `Nota informativa CIPM <mes>` (complementaria) | Un registro por medicamento citado | **Provisional**; solo propuestas positivas |
 
-> ⚠️ **El contenido actual es exclusivamente de demostración** (medicamentos, CN y acuerdos ficticios). No procede de ningún acuerdo real de la CIPM.
+Campos (schemaVersion 2): `id`, `fuente` (`acuerdos`/`nota`), `provisional`, `cipm`, `fecha`, `bloque`, `apartado`, `tipo` (= bloque · apartado), `nombreComercial`, `principioActivo`, `atc`, `laboratorio`, `codigoNacional` (lista), `huerfano` (solo notas, marca «H*»), `indicacion`, `indicacionObjeto`, `indicacionFinanciada`, `condiciones`, `decision` (primera frase del acuerdo), `acuerdo` (texto completo), `truncado`, `pagina`, `archivo`, `url`.
+
+Criterios:
+- **Texto literal**: bloque, apartado, indicaciones y acuerdo se copian del PDF; solo se unen líneas y se quitan cabeceras/pies de página. Textos de más de 4.000 caracteres se recortan (`truncado: true`) y se remite al PDF.
+- **Sin precio** (decisión explícita; no se extrae).
+- `meta.documentos` lista los PDF procesados; la interfaz lo muestra como «Cobertura». Un «sin resultados» solo es válido dentro de esa cobertura.
+
+### Actualizar los datos
+
+1. Copiar los PDF descargados de sanidad.gob.es a `fuentes/` (nombre libre; el tipo se detecta por el contenido).
+2. Opcional: añadir el enlace oficial de cada PDF en `fuentes/fuentes.json` (si falta, la interfaz enlaza la copia local).
+3. Ejecutar `python3 scripts/cipm_extract.py` (requiere `pdftotext`, paquete *poppler-utils*). Con `--check` solo valida.
+
+Validaciones del script:
+- **Acuerdos**: los expedientes extraídos (bloque, apartado, nombre y página) deben coincidir exactamente con el **índice del propio PDF**; si no, termina con error y no escribe el JSON.
+- **Notas**: se comparan los recuentos extraídos con las cifras del primer párrafo («N nuevos medicamentos…», «N nuevas indicaciones de M medicamentos»); las discrepancias se muestran como aviso.
+- Un documento de formato no reconocido detiene la extracción (no se generan datos parciales silenciosamente).
 
 ### Módulos
 
@@ -156,7 +156,9 @@ js/cipm/data.js     Carga y normalización de data/cipm.json
 js/cipm/search.js   Normalización de texto, búsqueda, orden y filtros (funciones puras)
 js/cipm/render.js   Renderizado HTML escapado de resultados
 css/cipm.css        Estilos de pestañas y del módulo (prefijos .app-tab / .cipm-)
-data/cipm.json      Base de datos local
+data/cipm.json      Base de datos local (generada)
+fuentes/            PDF oficiales de la CIPM + fuentes.json (enlaces oficiales, opcional)
+scripts/cipm_extract.py  Extracción PDF → data/cipm.json con validación
 ```
 
 ### Extensiones previstas (no implementadas)

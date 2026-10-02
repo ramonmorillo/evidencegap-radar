@@ -20,12 +20,13 @@ export function normalizeCode(s) {
 /**
  * Prepara un índice de búsqueda por registro. Solo se indexan los campos
  * de identificación del medicamento (principio activo, nombre comercial,
- * código nacional) para evitar falsos positivos en textos libres.
+ * código ATC y código nacional) para evitar falsos positivos en textos libres.
  */
 export function buildIndex(records) {
   return records.map(r => ({
     record: r,
-    text: normalizeText([r.principioActivo, r.nombreComercial].filter(Boolean).join(" | ")),
+    // ATC incluido: permite buscar por código (p. ej. "L01FF")
+    text: normalizeText([r.principioActivo, r.nombreComercial, r.atc].filter(Boolean).join(" | ")),
     codes: r.codigoNacional.map(normalizeCode).filter(Boolean)
   }));
 }

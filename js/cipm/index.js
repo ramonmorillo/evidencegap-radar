@@ -3,7 +3,7 @@
 // no comparte estado con EvidenceGap Radar.
 import { loadCipmData } from "./data.js";
 import { buildIndex, search, sortRecords, filterByType, typeOptions } from "./search.js";
-import { renderResults, renderEmpty, renderIdle } from "./render.js";
+import { renderResults, renderEmpty, renderIdle, coverageText } from "./render.js";
 import { esc } from "../util.js";
 
 let initPromise = null;
@@ -45,8 +45,10 @@ async function setup() {
 
   demoBanner.classList.toggle("hidden", !state.data.hasDemo);
   const { meta } = state.data;
+  const coverage = coverageText(meta.documentos);
   metaEl.textContent = `Base de datos local · ${state.data.records.length} registro(s)` +
-    (meta.updated ? ` · actualizada ${meta.updated}` : "");
+    (meta.updated ? ` · actualizada ${meta.updated}` : "") +
+    (coverage ? ` · Cobertura: ${coverage}` : "");
 
   // Tipos de acuerdo presentes en los datos (texto literal; no se presuponen categorías)
   typeSel.innerHTML = `<option value="">Todos los tipos</option>` +
@@ -62,11 +64,13 @@ async function setup() {
       out.innerHTML = renderIdle(state.data.records.length);
       return;
     }
-    const hits = sortRecords(filterByType(search(state.index, state.query), state.tipo), state.order);
-    countEl.textContent = hits.length
+    const all = search(state.index, state.query);
+    const hits = sortRecords(filterByType(all, state.tipo), state.order);
+    const hidden = all.length - hits.length;
+    countEl.textContent = (hits.length
       ? `${hits.length} ${hits.length === 1 ? "aparición" : "apariciones"}`
-      : "";
-    out.innerHTML = hits.length ? renderResults(hits) : renderEmpty();
+      : "") + (hidden ? ` · ${hidden} oculta${hidden !== 1 ? "s" : ""} por el filtro de tipo` : "");
+    out.innerHTML = hits.length ? renderResults(hits) : renderEmpty(coverage);
   }
 
   let timer;

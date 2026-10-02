@@ -1,0 +1,141 @@
+/* =====================================================================
+   Navegación por pestañas + módulo CIPM Finder.
+   Todas las reglas usan prefijos propios (.app-tab*, .cipm-*) para no
+   alterar los estilos de EvidenceGap Radar (styles.css).
+   ===================================================================== */
+
+.tab-panel[hidden] { display: none !important; }
+
+/* ---------------- TABS ---------------- */
+.app-tabs {
+  display: inline-flex; gap: 4px; margin-top: 18px; padding: 4px;
+  border-radius: 14px; border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+}
+.app-tabs .app-tab {
+  background: transparent; color: var(--muted); box-shadow: none;
+  border: 1px solid transparent; border-radius: 10px;
+  padding: 8px 18px; font-size: 14px; font-weight: 500;
+}
+.app-tabs .app-tab:hover { transform: none; box-shadow: none; color: var(--text); background: rgba(255,255,255,0.06); }
+.app-tabs .app-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.app-tabs .app-tab[aria-selected="true"] {
+  color: white; background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 4px 14px rgba(108,123,255,0.35);
+}
+.app-tabs .app-tab[data-tab="cipm"][aria-selected="true"] {
+  background: linear-gradient(135deg, var(--cipm-accent), var(--cipm-accent2));
+  box-shadow: 0 4px 14px rgba(32,196,170,0.3);
+}
+
+/* ---------------- CIPM MODULE ---------------- */
+:root {
+  --cipm-accent: #20c4aa;
+  --cipm-accent2: #2a8fd6;
+}
+
+.cipm-module .cipm-intro { border-top: 3px solid var(--cipm-accent); }
+.cipm-module-label {
+  display: inline-block; margin-bottom: 8px; padding: 3px 10px; border-radius: 12px;
+  font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--cipm-accent); background: rgba(32,196,170,0.12); border: 1px solid rgba(32,196,170,0.35);
+}
+.cipm-disclaimer {
+  margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.5;
+  color: var(--muted); background: rgba(255,255,255,0.04); border-left: 3px solid var(--warn);
+}
+
+.cipm-demo-banner {
+  margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5;
+  color: var(--warn); background: rgba(255,176,32,0.1); border: 1px dashed rgba(255,176,32,0.55);
+}
+.cipm-demo-badge {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+  color: var(--warn); background: rgba(255,176,32,0.14); border: 1px dashed rgba(255,176,32,0.6);
+}
+
+/* Search form */
+.cipm-search-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.cipm-search-row input[type="search"] { flex: 1 1 280px; min-width: 0; }
+.cipm-filters { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+.cipm-filters label { display: inline-flex; align-items: center; gap: 8px; }
+.cipm-filters select { min-width: 0; max-width: 100%; }
+.cipm-filters label { min-width: 0; max-width: 100%; }
+.cipm-module button.cipm-primary {
+  background: linear-gradient(135deg, var(--cipm-accent), var(--cipm-accent2));
+  box-shadow: 0 6px 18px rgba(32,196,170,0.3);
+}
+.cipm-module button.cipm-primary:hover { box-shadow: 0 10px 24px rgba(32,196,170,0.4); }
+.cipm-meta { margin-top: 12px; font-size: 12px; color: var(--muted); }
+.cipm-status { margin-top: 12px; font-size: 13px; color: var(--muted); }
+
+/* Results */
+.cipm-count { font-size: 13px; color: var(--muted); }
+.cipm-idle { padding: 20px 4px 4px; color: var(--muted); font-size: 14px; }
+.cipm-idle-count { display: block; margin-top: 4px; font-size: 12px; }
+.cipm-results-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+
+.cipm-result {
+  border-radius: 14px; border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04); border-left: 3px solid var(--cipm-accent);
+}
+.cipm-result.is-demo { border-left-color: var(--warn); }
+.cipm-result > summary {
+  list-style: none; cursor: pointer; padding: 14px 40px 14px 16px; position: relative;
+}
+.cipm-result > summary::-webkit-details-marker { display: none; }
+.cipm-result > summary::after {
+  content: "▸"; position: absolute; right: 16px; top: 14px;
+  color: var(--muted); transition: transform 0.15s ease;
+}
+.cipm-result[open] > summary::after { transform: rotate(90deg); }
+.cipm-result > summary:hover { background: rgba(255,255,255,0.03); border-radius: 14px; }
+.cipm-result > summary:focus-visible { outline: 2px solid var(--cipm-accent); outline-offset: -2px; border-radius: 14px; }
+
+.cipm-result-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; }
+.cipm-num { font-weight: 700; color: var(--cipm-accent); }
+.cipm-date { color: var(--muted); }
+.cipm-type {
+  padding: 2px 8px; border-radius: 10px; font-size: 11px;
+  background: rgba(42,143,214,0.15); color: #7cc4f5; border: 1px solid rgba(42,143,214,0.35);
+}
+.cipm-result-title { margin-top: 6px; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.cipm-result-decision { margin-top: 4px; font-size: 13px; color: rgba(255,255,255,0.75); }
+
+.cipm-result-body { padding: 4px 16px 16px; border-top: 1px solid var(--border); }
+.cipm-dl {
+  display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px;
+  margin: 12px 0 0; font-size: 13px;
+}
+.cipm-dl dt { color: var(--muted); }
+.cipm-dl dd { margin: 0; overflow-wrap: anywhere; }
+.cipm-dl small { color: var(--muted); }
+.cipm-dl a { color: var(--cipm-accent); }
+.cipm-na { color: var(--muted); font-style: italic; }
+.cipm-extract {
+  margin-top: 12px; padding: 10px 12px; border-radius: 10px;
+  background: rgba(0,0,0,0.2); border: 1px solid var(--border);
+}
+.cipm-extract-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cipm-extract p { margin: 6px 0 0; font-size: 13px; line-height: 1.55; }
+
+/* ---------------- RESPONSIVE ---------------- */
+@media (max-width: 700px) {
+  .app-tabs { display: flex; width: 100%; }
+  .app-tabs .app-tab { flex: 1; padding: 8px 10px; }
+  .cipm-search-row button { flex: 1; }
+  .cipm-filters label { flex: 1 1 100%; }
+  .cipm-filters select { flex: 1; min-width: 0; }
+  .cipm-dl { grid-template-columns: 1fr; gap: 2px; }
+  .cipm-dl dd { margin-bottom: 8px; }
+}
+
+/* ---------------- PRINT ---------------- */
+@media print {
+  .cipm-search-row, .cipm-filters { display: none !important; }
+  .cipm-result { border: 1px solid #ccc; background: white !important; }
+  .cipm-result-decision, .cipm-dl dd, .cipm-extract p { color: black; }
+  .cipm-extract { background: #f5f5f5 !important; }
+  .cipm-demo-banner, .cipm-demo-badge { color: #8a5a00; border-color: #c90; }
+}

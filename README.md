@@ -111,6 +111,60 @@ Botón **"Limpiar caché"** borra solo entradas `egr_*`.
 
 ---
 
+## CIPM Finder (segunda pestaña)
+
+Módulo independiente para buscar apariciones de un medicamento en los acuerdos publicados de la **Comisión Interministerial de Precios de los Medicamentos (CIPM)**. No comparte estado, caché ni lógica con EvidenceGap Radar.
+
+- **Navegación**: pestañas `EvidenceGap Radar | CIPM Finder` (`js/tabs.js`). El hash `#cipm` abre directamente CIPM Finder; los enlaces reproducibles de Radar (`#q=...`) siguen funcionando igual.
+- **Carga diferida**: el módulo y su base de datos solo se cargan al abrir la pestaña por primera vez.
+- **Búsqueda**: por principio activo, nombre comercial o código nacional; insensible a mayúsculas/acentos; varios términos se combinan con AND; el CN admite puntos o espacios (`000.001`).
+- **Resultados**: orden cronológico (más reciente primero por defecto), filtro por tipo de acuerdo (generado a partir de los datos) y ficha desplegable con todos los campos.
+
+### Base de datos local: `data/cipm.json`
+
+```json
+{
+  "meta": { "schemaVersion": 1, "isDemo": true, "updated": "AAAA-MM-DD", "source": "...", "notes": "..." },
+  "records": [
+    {
+      "id": "único", "demo": false,
+      "cipm": "271", "fecha": "AAAA-MM-DD",
+      "principioActivo": "...", "nombreComercial": "...",
+      "codigoNacional": ["000000"],
+      "tipo": "...", "indicacion": "...", "decision": "...", "extracto": "...",
+      "pagina": 10, "url": "https://..."
+    }
+  ]
+}
+```
+
+- **Granularidad**: un registro por **medicamento y acuerdo CIPM**. Varias presentaciones del mismo medicamento en el mismo acuerdo se agrupan en `codigoNacional` (lista).
+- **Texto literal**: `tipo`, `indicacion` y `decision` se transcriben tal cual del acuerdo publicado, sin recodificar. El filtro por tipo agrupa solo variantes de formato (mayúsculas, acentos, espacios, punto final) y muestra la primera forma literal encontrada.
+- `codigoNacional` acepta texto o lista.
+- Campos ausentes → `null` (la interfaz muestra «No disponible»).
+- `url` solo se enlaza si empieza por `http(s)://`; si hay `pagina` se añade `#page=N`.
+- Registros con `demo: true` (o `meta.isDemo: true`) se marcan visiblemente como **«Datos de demostración»**.
+
+> ⚠️ **El contenido actual es exclusivamente de demostración** (medicamentos, CN y acuerdos ficticios). No procede de ningún acuerdo real de la CIPM.
+
+### Módulos
+
+```
+js/tabs.js          Navegación por pestañas (solo muestra/oculta paneles)
+js/cipm/index.js    Controlador del módulo (eventos, estado)
+js/cipm/data.js     Carga y normalización de data/cipm.json
+js/cipm/search.js   Normalización de texto, búsqueda, orden y filtros (funciones puras)
+js/cipm/render.js   Renderizado HTML escapado de resultados
+css/cipm.css        Estilos de pestañas y del módulo (prefijos .app-tab / .cipm-)
+data/cipm.json      Base de datos local
+```
+
+### Extensiones previstas (no implementadas)
+
+Filtros por decisión/fecha/nº CIPM, histórico completo por medicamento, informes públicos de financiación, financiación vigente, exportación y actualización automática de nuevas CIPM. La separación `data` / `search` / `render` permite añadirlas sin tocar EvidenceGap Radar; la actualización automática solo tendría que regenerar `data/cipm.json` con el mismo esquema.
+
+---
+
 ## Estructura de archivos
 
 ```

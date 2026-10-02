@@ -1,0 +1,74 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "dataset": "demo",
+    "isDemo": true,
+    "updated": "2026-10-02",
+    "granularidad": "Un registro por medicamento y acuerdo CIPM. Si un mismo medicamento tiene varias presentaciones en el mismo acuerdo, sus códigos nacionales se agrupan en la lista codigoNacional.",
+    "criterioTexto": "Los campos tipo, indicacion y decision se transcriben literalmente del acuerdo publicado, sin recodificar a categorías propias.",
+    "source": "Registros ficticios creados para probar la interfaz. No proceden de ningún acuerdo real de la CIPM.",
+    "notes": "Sustituir por registros extraídos de los acuerdos oficiales publicados por el Ministerio de Sanidad en la fase de extracción. Cada registro real debe llevar demo=false, url al documento oficial y, si es posible, página."
+  },
+  "records": [
+    {
+      "id": "demo-0001",
+      "demo": true,
+      "cipm": "DEMO-03",
+      "fecha": "2026-06-17",
+      "principioActivo": "demostratinib",
+      "nombreComercial": "Demostra®",
+      "codigoNacional": ["000001", "000002"],
+      "tipo": "Nueva indicación",
+      "indicacion": "Indicación ficticia de demostración (sin correspondencia clínica real).",
+      "decision": "Resultado ficticio de demostración",
+      "extracto": "Texto ficticio de demostración. Este registro sirve únicamente para comprobar el funcionamiento del buscador y no representa ningún acuerdo real.",
+      "pagina": 10,
+      "url": null
+    },
+    {
+      "id": "demo-0002",
+      "demo": true,
+      "cipm": "DEMO-02",
+      "fecha": "2026-03-05",
+      "principioActivo": "demostratinib",
+      "nombreComercial": "Demostra®",
+      "codigoNacional": ["000001"],
+      "tipo": "Inclusión en la prestación farmacéutica",
+      "indicacion": "Indicación ficticia de demostración (sin correspondencia clínica real).",
+      "decision": "Resultado ficticio de demostración",
+      "extracto": "Texto ficticio de demostración para mostrar el histórico de un mismo medicamento en varias CIPM.",
+      "pagina": 4,
+      "url": null
+    },
+    {
+      "id": "demo-0003",
+      "demo": true,
+      "cipm": "DEMO-02",
+      "fecha": "2026-03-05",
+      "principioActivo": "ejemplomab",
+      "nombreComercial": "Ejémplox®",
+      "codigoNacional": "000003",
+      "tipo": "Revisión de precio",
+      "indicacion": null,
+      "decision": "Resultado ficticio de demostración",
+      "extracto": "Texto ficticio de demostración. Registro sin indicación para comprobar la presentación de campos ausentes.",
+      "pagina": null,
+      "url": null
+    },
+    {
+      "id": "demo-0004",
+      "demo": true,
+      "cipm": "DEMO-01",
+      "fecha": "2025-11-20",
+      "principioActivo": "ficticiaprazol",
+      "nombreComercial": "Muéstrazol®",
+      "codigoNacional": "000004",
+      "tipo": "No inclusión en la prestación farmacéutica",
+      "indicacion": "Indicación ficticia de demostración (sin correspondencia clínica real).",
+      "decision": "Resultado ficticio de demostración",
+      "extracto": "Texto ficticio de demostración. Permite comprobar la búsqueda tolerante a acentos (p. ej. «muestrazol» encuentra «Muéstrazol»).",
+      "pagina": 7,
+      "url": null
+    }
+  ]
+}

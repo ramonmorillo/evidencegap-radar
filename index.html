@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="styles.css?v=20260217_5" />
+  <link rel="stylesheet" href="css/cipm.css?v=20261002_2" />
 </head>
 
 <body>
@@ -13,9 +14,13 @@
   <header class="header">
     <h1>EvidenceGap Radar</h1>
     <p class="author">Creado por Ramón Morillo · Febrero 2026</p>
+    <nav class="app-tabs" role="tablist" aria-label="Módulos">
+      <button type="button" class="app-tab" role="tab" id="tab-radar" data-tab="radar" aria-controls="panel-radar" aria-selected="true">EvidenceGap Radar</button>
+      <button type="button" class="app-tab" role="tab" id="tab-cipm" data-tab="cipm" aria-controls="panel-cipm" aria-selected="false" tabindex="-1">CIPM Finder</button>
+    </nav>
   </header>
 
-  <main class="container">
+  <main class="container tab-panel" id="panel-radar" role="tabpanel" aria-labelledby="tab-radar">
 
     <!-- Texto explicativo -->
     <section class="card intro-card">
@@ -155,6 +160,57 @@
 
   </main>
 
+  <!-- ===================== CIPM Finder (módulo independiente) ===================== -->
+  <main class="container tab-panel cipm-module" id="panel-cipm" role="tabpanel" aria-labelledby="tab-cipm" hidden>
+
+    <section class="card intro-card cipm-intro">
+      <span class="cipm-module-label">CIPM Finder</span>
+      <p class="intro-main">
+        Busca las apariciones de un medicamento en los acuerdos publicados de la Comisión Interministerial de Precios de los Medicamentos (CIPM).
+      </p>
+      <p class="cipm-disclaimer">
+        Los acuerdos publicados por la CIPM no equivalen necesariamente a la resolución definitiva de financiación. La información debe verificarse siempre en las fuentes oficiales vigentes.
+      </p>
+    </section>
+
+    <section class="card">
+      <div id="cipmDemoBanner" class="cipm-demo-banner hidden" role="note">
+        <b>Datos de demostración.</b> La base de datos actual contiene registros ficticios creados para probar la interfaz. No corresponden a acuerdos reales de la CIPM ni deben usarse para ninguna decisión.
+      </div>
+
+      <h2>Buscar medicamento</h2>
+      <div class="cipm-search-row" role="search">
+        <input id="cipmQuery" type="search" placeholder="Principio activo, nombre comercial o código nacional" aria-label="Principio activo, nombre comercial o código nacional" autocomplete="off" spellcheck="false" />
+        <button id="cipmSearch" class="cipm-primary" type="button">Buscar</button>
+        <button id="cipmClear" class="secondary" type="button">Limpiar</button>
+      </div>
+
+      <div class="cipm-filters">
+        <label>Tipo de acuerdo
+          <select id="cipmType"><option value="">Todos los tipos</option></select>
+        </label>
+        <label>Orden
+          <select id="cipmOrder">
+            <option value="desc">Más reciente primero</option>
+            <option value="asc">Más antiguo primero</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="cipmMeta" class="cipm-meta"></div>
+      <div id="cipmStatus" class="cipm-status hidden" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <div class="results-header">
+        <h2>Apariciones en acuerdos CIPM</h2>
+        <span id="cipmCount" class="cipm-count" aria-live="polite"></span>
+      </div>
+      <div id="cipmResults"></div>
+    </section>
+
+  </main>
+
   <footer class="site-footer">
     <div class="footer-inner">
       <span>&copy; 2026 Ramón Morillo</span>
@@ -164,6 +220,7 @@
   </footer>
 
   <script type="module" src="js/app.js?v=20260218_6"></script>
+  <script type="module" src="js/tabs.js?v=20261002_2"></script>
 
 </body>
 </html>

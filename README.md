@@ -147,6 +147,13 @@ Validaciones del script:
 - **Notas**: se comparan los recuentos extraídos con las cifras del primer párrafo («N nuevos medicamentos…», «N nuevas indicaciones de M medicamentos»); las discrepancias se muestran como aviso.
 - Un documento de formato no reconocido detiene la extracción (no se generan datos parciales silenciosamente).
 
+### Vista «Histórico por principio activo»
+
+Agrupa los resultados de la búsqueda por principio activo y muestra cada grupo como una línea temporal de expedientes (orden según el selector).
+- Clave de agrupación: **código ATC completo** (7 caracteres) cuando existe, de modo que se reúnen marcas, biosimilares y genéricos de la misma sustancia; si no hay ATC (notas informativas), se une por principio activo normalizado.
+- Cabecera del grupo: principio activo, ATC, marcas, rango de fechas y recuento por **bloque literal** del documento (aceptación / denegatorios / notas provisionales). No se interpreta el contenido del acuerdo.
+- Color: verde = bloque de precio y financiación o «Acuerdos favorables»; rojo = «Acuerdos denegatorios»; ámbar = nota informativa (provisional).
+
 ### Módulos
 
 ```
@@ -154,6 +161,7 @@ js/tabs.js          Navegación por pestañas (solo muestra/oculta paneles)
 js/cipm/index.js    Controlador del módulo (eventos, estado)
 js/cipm/data.js     Carga y normalización de data/cipm.json
 js/cipm/search.js   Normalización de texto, búsqueda, orden y filtros (funciones puras)
+js/cipm/history.js  Agrupación por principio activo para la vista histórico (funciones puras)
 js/cipm/render.js   Renderizado HTML escapado de resultados
 css/cipm.css        Estilos de pestañas y del módulo (prefijos .app-tab / .cipm-)
 data/cipm.json      Base de datos local (generada)

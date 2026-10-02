@@ -1,5 +1,6 @@
 // CIPM Finder — renderizado de resultados (HTML escapado).
 import { esc } from "../util.js";
+import { blockKind } from "./history.js";
 
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -18,11 +19,8 @@ export function demoBadge() {
 
 /** Etiqueta visual del bloque. El texto mostrado es siempre el literal del documento. */
 function blockClass(r) {
-  if (r.fuente === "nota") return "is-nota";
-  const b = (r.bloque || "").toLowerCase();
-  if (b.includes("denegatorio")) return "is-neg";
-  if (b.includes("precio y financiaci")) return "is-pos";
-  return "";
+  const k = blockKind(r);
+  return k === "otro" ? "" : `is-${k}`;
 }
 
 function sourceLabel(r) {
@@ -55,7 +53,7 @@ function textBlock(label, text) {
   return `<div class="cipm-extract"><div class="cipm-extract-label">${esc(label)}</div><p>${esc(text)}</p></div>`;
 }
 
-function resultCard(r) {
+export function resultCard(r) {
   const title = [r.nombreComercial, r.principioActivo].filter(Boolean).map(esc).join(" · ");
   const cn = r.codigoNacional.length ? r.codigoNacional.map(esc).join(", ") : null;
   const cls = blockClass(r);
@@ -101,6 +99,37 @@ function resultCard(r) {
 
 export function renderResults(records) {
   return `<div class="cipm-results-list">${records.map(resultCard).join("")}</div>`;
+}
+
+/** Vista histórico: un bloque por principio activo con su línea temporal. */
+export function renderHistory(groups) {
+  return `<div class="cipm-history">${groups.map(historyGroup).join("")}</div>`;
+}
+
+function historyGroup(g) {
+  const n = g.records.length;
+  const range = g.primera && g.ultima
+    ? (g.primera === g.ultima ? formatDate(g.primera) : `${formatDate(g.primera)} – ${formatDate(g.ultima)}`)
+    : "";
+  const parts = [
+    g.counts.pos ? `<span class="cipm-block is-pos">${g.counts.pos} en acuerdos de precio y financiación (aceptación)</span>` : "",
+    g.counts.neg ? `<span class="cipm-block is-neg">${g.counts.neg} en acuerdos denegatorios</span>` : "",
+    g.counts.nota ? `<span class="cipm-prov-badge">${g.counts.nota} en notas informativas</span>` : "",
+    g.counts.otro ? `<span class="cipm-block">${g.counts.otro} en otros apartados</span>` : ""
+  ].filter(Boolean).join(" ");
+  return `
+  <section class="cipm-hgroup">
+    <div class="cipm-hgroup-head">
+      <div class="cipm-hgroup-title">${g.principios.map(esc).join(" / ") || "Principio activo no disponible"}
+        ${g.atc.map(a => `<span class="cipm-atc">${esc(a)}</span>`).join(" ")}</div>
+      <div class="cipm-hgroup-meta">${n} aparicion${n !== 1 ? "es" : ""}${range ? ` · ${esc(range)}` : ""}
+        ${g.marcas.length ? ` · ${g.marcas.map(esc).join(", ")}` : ""}</div>
+      <div class="cipm-hgroup-counts">${parts}</div>
+    </div>
+    <ol class="cipm-timeline">
+      ${g.records.map(r => `<li class="cipm-tl-item ${blockClass(r)}"><span class="cipm-tl-dot" aria-hidden="true"></span>${resultCard(r)}</li>`).join("")}
+    </ol>
+  </section>`;
 }
 
 export function renderEmpty(coverage) {

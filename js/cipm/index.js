@@ -3,7 +3,8 @@
 // no comparte estado con EvidenceGap Radar.
 import { loadCipmData } from "./data.js";
 import { buildIndex, search, sortRecords, filterByType, typeOptions } from "./search.js";
-import { renderResults, renderEmpty, renderIdle, renderFilteredOut, coverageText } from "./render.js";
+import { renderResults, renderHistory, renderEmpty, renderIdle, renderFilteredOut, coverageText } from "./render.js";
+import { groupByActive } from "./history.js";
 import { esc } from "../util.js";
 
 let initPromise = null;
@@ -21,6 +22,7 @@ async function setup() {
   const btnClear   = $("cipmClear");
   const typeSel    = $("cipmType");
   const orderSel   = $("cipmOrder");
+  const viewSel    = $("cipmView");
   const out        = $("cipmResults");
   const countEl    = $("cipmCount");
   const statusEl   = $("cipmStatus");
@@ -28,7 +30,7 @@ async function setup() {
   const metaEl     = $("cipmMeta");
   if (!input || !out) return;
 
-  const state = { data: null, index: [], query: "", tipo: "", order: "desc" };
+  const state = { data: null, index: [], query: "", tipo: "", order: "desc", view: "list" };
 
   statusEl.textContent = "Cargando base de datos local…";
   statusEl.classList.remove("hidden");
@@ -59,6 +61,7 @@ async function setup() {
     state.query = input.value;
     state.tipo = typeSel.value;
     state.order = orderSel.value;
+    state.view = viewSel ? viewSel.value : "list";
     if (!state.query.trim()) {
       countEl.textContent = "";
       out.innerHTML = renderIdle(state.data.records.length);
@@ -67,11 +70,13 @@ async function setup() {
     const all = search(state.index, state.query);
     const hits = sortRecords(filterByType(all, state.tipo), state.order);
     const hidden = all.length - hits.length;
+    const groups = state.view === "history" && hits.length ? groupByActive(hits, state.order) : null;
     countEl.textContent = [
       hits.length ? `${hits.length} ${hits.length === 1 ? "aparición" : "apariciones"}` : "",
+      groups ? `${groups.length} principio${groups.length !== 1 ? "s" : ""} activo${groups.length !== 1 ? "s" : ""}` : "",
       hidden ? `${hidden} oculta${hidden !== 1 ? "s" : ""} por el filtro de tipo` : ""
     ].filter(Boolean).join(" · ");
-    if (hits.length) out.innerHTML = renderResults(hits);
+    if (hits.length) out.innerHTML = groups ? renderHistory(groups) : renderResults(hits);
     else if (all.length) out.innerHTML = renderFilteredOut(all.length);
     else out.innerHTML = renderEmpty(coverage);
   }
@@ -85,6 +90,7 @@ async function setup() {
   btnClear.addEventListener("click", () => { input.value = ""; typeSel.value = ""; run(); input.focus(); });
   typeSel.addEventListener("change", run);
   orderSel.addEventListener("change", run);
+  if (viewSel) viewSel.addEventListener("change", run);
 
   run();
 }

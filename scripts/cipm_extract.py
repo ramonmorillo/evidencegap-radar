@@ -134,7 +134,8 @@ def load_manifest():
 ROMAN = r"[ivxl]+"
 TOC_RE = re.compile(rf"^({ROMAN})\)\s*(.+?)\s*\.{{3,}}\s*(\d+)$")
 EXP_RE = re.compile(rf"^({ROMAN})\)\s*(.+?)\s*\.{{5,}}\s*\d*$")
-BLOQUE_RE = re.compile(r"^([12])\)\s*(Acuerdos.*?)\s*(\.{3,}\s*\d+)?$")
+# Numeración del bloque: "1)", "2)" o, en algún documento, "2.2" (CIPM 260)
+BLOQUE_RE = re.compile(r"^(\d(?:\)|\.\d\.?))\s*(Acuerdos.*?)\s*(\.{3,}\s*\d+)?$")
 APARTADO_RE = re.compile(r"^([a-d])\)\s+([A-ZÁÉÍÓÚ][^.]*?)\.?\s*(\.{3,}\s*\d+)?$")
 
 
@@ -273,7 +274,8 @@ def parse_acuerdos(path, pages, manifest_entry):
         raise ExtractionError(f"{path.name}: no se encuentra el índice ('Contenido')")
 
     # Cuerpo: a partir de la 2.ª aparición del primer bloque (la 1.ª es el índice)
-    starts = [i for i, (_, l) in enumerate(lines) if BLOQUE_RE.match(l.strip()) and l.strip().startswith("1)")]
+    starts = [i for i, (_, l) in enumerate(lines)
+              if (mb0 := BLOQUE_RE.match(l.strip())) and norm_key(mb0[2]).startswith("acuerdos de precio")]
     if len(starts) < 2:
         raise ExtractionError(f"{path.name}: no se localiza el inicio del cuerpo")
     bloque = apartado = None
@@ -311,6 +313,19 @@ def parse_acuerdos(path, pages, manifest_entry):
             problems.append(f"  índice: {t}\n  extraído: {g}")
         elif sim < 1:
             warnings.append(f"nombre distinto en índice ('{t[2]}') y cuerpo ('{g[2]}'), p. {g[3]}; se usa el del cuerpo")
+    # Comprobación independiente de los bloques: cada línea del texto bruto que
+    # empiece por "Acuerdos …" con puntos de índice debe corresponder a un bloque
+    # detectado (evita asignar expedientes al bloque equivocado si cambia la numeración).
+    # Un encabezado seguido directamente de otro (p. ej. "1) Acuerdos de Precio…"
+    # → "2.1 Acuerdos favorables", CIPM 261-262) es un contenedor sin expedientes.
+    toc_lines = [l.strip() for _, l in lines if re.search(r"\.{3,}\s*\d+$", l.strip())]
+    is_block = [bool(re.match(r"^[\d.)\s]*Acuerdos\b", t)) for t in toc_lines]
+    raw_blocks = [norm_key(re.sub(r"\.{3,}\s*\d+$", "", re.sub(r"^[\d.)\s]+", "", t)))
+                  for i, t in enumerate(toc_lines)
+                  if is_block[i] and not (i + 1 < len(toc_lines) and is_block[i + 1])]
+    toc_blocks = list(dict.fromkeys(norm_key(t[0]) for t in toc))
+    if raw_blocks != toc_blocks:
+        problems.append(f"  bloques en el índice {raw_blocks} ≠ bloques asignados {toc_blocks}")
     if problems:
         raise ExtractionError(
             f"{path.name}: los expedientes no coinciden con el índice\n" + "\n".join(problems[:10]))

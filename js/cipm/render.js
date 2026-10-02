@@ -109,6 +109,12 @@ export function renderEmpty(coverage) {
     ${coverage ? `<p class="cipm-muted cipm-coverage-note">Cobertura actual: ${esc(coverage)}. Que no aparezca no implica que el medicamento no haya pasado por la CIPM fuera de esos documentos.</p>` : ""}</div>`;
 }
 
+export function renderFilteredOut(n) {
+  return `<div class="empty-state cipm-empty"><p><b>Sin resultados con este filtro</b></p>
+    <p>Hay ${n} aparicion${n !== 1 ? "es" : ""} de este medicamento, pero ninguna del tipo de acuerdo seleccionado.
+    Selecciona «Todos los tipos» para verlas.</p></div>`;
+}
+
 export function renderIdle(total) {
   return `<div class="cipm-idle">Introduce un principio activo, nombre comercial, código nacional o código ATC.
     <span class="cipm-idle-count">${total} registro${total !== 1 ? "s" : ""} en la base de datos local.</span></div>`;

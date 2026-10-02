@@ -3,7 +3,7 @@
 // no comparte estado con EvidenceGap Radar.
 import { loadCipmData } from "./data.js";
 import { buildIndex, search, sortRecords, filterByType, typeOptions } from "./search.js";
-import { renderResults, renderEmpty, renderIdle, coverageText } from "./render.js";
+import { renderResults, renderEmpty, renderIdle, renderFilteredOut, coverageText } from "./render.js";
 import { esc } from "../util.js";
 
 let initPromise = null;
@@ -67,10 +67,13 @@ async function setup() {
     const all = search(state.index, state.query);
     const hits = sortRecords(filterByType(all, state.tipo), state.order);
     const hidden = all.length - hits.length;
-    countEl.textContent = (hits.length
-      ? `${hits.length} ${hits.length === 1 ? "aparición" : "apariciones"}`
-      : "") + (hidden ? ` · ${hidden} oculta${hidden !== 1 ? "s" : ""} por el filtro de tipo` : "");
-    out.innerHTML = hits.length ? renderResults(hits) : renderEmpty(coverage);
+    countEl.textContent = [
+      hits.length ? `${hits.length} ${hits.length === 1 ? "aparición" : "apariciones"}` : "",
+      hidden ? `${hidden} oculta${hidden !== 1 ? "s" : ""} por el filtro de tipo` : ""
+    ].filter(Boolean).join(" · ");
+    if (hits.length) out.innerHTML = renderResults(hits);
+    else if (all.length) out.innerHTML = renderFilteredOut(all.length);
+    else out.innerHTML = renderEmpty(coverage);
   }
 
   let timer;

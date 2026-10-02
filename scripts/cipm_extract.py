@@ -24,6 +24,7 @@ Uso:
   python3 scripts/cipm_extract.py --check    # solo valida, no escribe
 """
 
+import difflib
 import json
 import re
 import shutil
@@ -133,7 +134,7 @@ def load_manifest():
 ROMAN = r"[ivxl]+"
 TOC_RE = re.compile(rf"^({ROMAN})\)\s*(.+?)\s*\.{{3,}}\s*(\d+)$")
 EXP_RE = re.compile(rf"^({ROMAN})\)\s*(.+?)\s*\.{{5,}}\s*\d*$")
-BLOQUE_RE = re.compile(r"^([12])\)\s+(Acuerdos.*?)\s*(\.{3,}\s*\d+)?$")
+BLOQUE_RE = re.compile(r"^([12])\)\s*(Acuerdos.*?)\s*(\.{3,}\s*\d+)?$")
 APARTADO_RE = re.compile(r"^([a-d])\)\s+([A-ZÁÉÍÓÚ][^.]*?)\.?\s*(\.{3,}\s*\d+)?$")
 
 
@@ -160,6 +161,12 @@ def parse_toc(lines):
     return toc
 
 
+def norm_key(s):
+    """Clave de comparación: sin acentos, minúsculas, sin puntuación."""
+    s = unicodedata.normalize("NFD", s or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+
 def clean_name(s):
     return re.sub(r"\s+", " ", s.replace("®", "")).strip()
 
@@ -171,12 +178,15 @@ def table_column(header, word):
 
 def parse_table(tlines):
     """Laboratorio y CN de la tabla del expediente (sin precio)."""
-    header_idx = next((i for i, l in enumerate(tlines) if "LABORATORIO" in l and "MEDICAMENTO" in l), None)
+    # La cabecera puede ocupar varias líneas ("MEDICAMENTO" en otra fila que "LABORATORIO")
+    header_idx = next((i for i, l in enumerate(tlines) if "LABORATORIO" in l), None)
     cns, lab_parts = [], []
     if header_idx is None:
         return None, cns
-    header = tlines[header_idx]
-    med_col = table_column(header, "MEDICAMENTO")
+    near = tlines[max(0, header_idx - 2):header_idx + 3]
+    med_line = next((l for l in near if "MEDICAMENTO" in l), None)
+    med_col = table_column(med_line, "MEDICAMENTO") if med_line else None
+    header_idx = max(header_idx, tlines.index(med_line) if med_line else header_idx)
     for line in tlines[header_idx + 1:]:
         # Código nacional: 6 dígitos aislados (los precios llevan coma decimal)
         cns += re.findall(r"(?<![\d,.])(\d{6})(?![\d,])", line)
@@ -194,7 +204,8 @@ SECTION_RE = {
     "indicacionFinanciada": re.compile(r"^Indicaci(ón|ones) terap[ée]utica(s)? financiada(s)?\s*(:|$)", re.I),
     "indicacionObjeto": re.compile(r"^Indicaci(ón|ones)( terap[ée]utica(s)?)? objeto\b[^:]*(:|$)", re.I),
     "condiciones": re.compile(r"^Condiciones de prescripci[oó]n", re.I),
-    "acuerdo": re.compile(r"^Con respecto a (este|estos|esta|estas)\b", re.I),
+    # "Con respecto a este medicamento…", "…a estos medicamentos…", "…a la presentación…"
+    "acuerdo": re.compile(r"^Con respecto a\b", re.I),
 }
 
 
@@ -222,7 +233,9 @@ def first_decision(acuerdo_paras):
     if first.rstrip().endswith(":") and len(acuerdo_paras) > 1:
         bullet = acuerdo_paras[1].lstrip("• ").strip()
         return f"{first} {bullet}"
-    m = re.match(r"(.+?\.)(\s|$)", first)
+    # Fin de frase: punto tras minúscula/dígito/paréntesis seguido de mayúscula o fin
+    # (evita cortar en abreviaturas como "C.N." o "S.L.")
+    m = re.match(r"(.+?[a-záéíóúñ0-9)]\.)(?=\s+[A-ZÁÉÍÓÚ]|\s*$)", first)
     return m[1] if m else first
 
 
@@ -259,16 +272,29 @@ def parse_acuerdos(path, pages, manifest_entry):
         if cur is not None:
             cur["lines"].append(line)
 
-    # Validación contra el índice
+    # Validación contra el índice: mismo número de expedientes, misma posición,
+    # bloque/apartado y página idénticos (salvo formato). En el nombre se toleran
+    # erratas leves del propio documento (p. ej. "Omyclo" en el índice y
+    # "Omlyclo" en el cuerpo del CIPM 257): se registran como aviso y se usa el
+    # nombre del cuerpo del expediente.
+    warnings = []
     got = [(e["bloque"], e["apartado"], e["nombre"], e["pagina"]) for e in exps]
-    if got != toc:
-        diff = [f"  índice: {t}\n  extraído: {g}" for t, g in zip(toc, got) if t != g]
+    problems = []
+    if len(got) != len(toc):
+        problems.append(f"  {len(got)} extraídos / {len(toc)} en índice")
+    for t, g in zip(toc, got):
+        same_section = norm_key(t[0]) == norm_key(g[0]) and norm_key(t[1]) == norm_key(g[1])
+        sim = difflib.SequenceMatcher(None, norm_key(t[2]), norm_key(g[2])).ratio()
+        if not same_section or t[3] != g[3] or sim < 0.75:
+            problems.append(f"  índice: {t}\n  extraído: {g}")
+        elif sim < 1:
+            warnings.append(f"nombre distinto en índice ('{t[2]}') y cuerpo ('{g[2]}'), p. {g[3]}; se usa el del cuerpo")
+    if problems:
         raise ExtractionError(
-            f"{path.name}: los expedientes no coinciden con el índice "
-            f"({len(got)} extraídos / {len(toc)} en índice)\n" + "\n".join(diff[:10]))
+            f"{path.name}: los expedientes no coinciden con el índice\n" + "\n".join(problems[:10]))
 
     url = (manifest_entry or {}).get("url")
-    records, warnings = [], []
+    records = []
     bloque_n = {}
     for e in exps:
         text = e["lines"]
@@ -279,12 +305,23 @@ def parse_acuerdos(path, pages, manifest_entry):
         else:
             table, body = text[:pa_idx], text[pa_idx + 1:]
             pa_line = re.sub(r"\s+", " ", text[pa_idx].split(":", 1)[1]).strip().rstrip(".")
-            mpa = re.match(r"^([A-Z]\d{2}[A-Z]{0,2}\d{0,2})\s*[-–]?\s*(.*)$", pa_line)
-            atc, pa = (mpa[1], mpa[2].strip() or None) if mpa else (None, pa_line)
+            ATC = r"[A-Z]\d{2}(?:[A-Z]{1,2}\d{0,2})?"
+            mpa = re.match(rf"^({ATC})\s*[-–]?\s*(.*)$", pa_line)
+            mpb = re.match(rf"^(.*?)\s*[-–]\s*({ATC})$", pa_line)  # orden invertido: "nombre – ATC"
+            if mpa:
+                atc, pa = mpa[1], mpa[2].strip() or None
+            elif mpb:
+                atc, pa = mpb[2], mpb[1].strip() or None
+            else:
+                atc, pa = None, pa_line
         lab, cns = parse_table(table)
+        # Tablas muy fragmentadas mezclan columnas: mejor sin dato que un dato erróneo
+        if lab and (len(lab) > 80 or norm_key(e["nombre"]).split()[0] in norm_key(lab).split()):
+            warnings.append(f"{e['nombre']}: laboratorio no extraíble de forma fiable (tabla fragmentada); se deja vacío")
+            lab = None
         # Algunos expedientes incluyen más de una tabla (otras presentaciones)
         for k, l in enumerate(body):
-            if "LABORATORIO" in l and "MEDICAMENTO" in l:
+            if "LABORATORIO" in l:
                 end = next((j for j in range(k + 1, len(body)) if body[j].strip().startswith("Principio activo:")), len(body))
                 _, extra = parse_table(body[k:end])
                 cns += [c for c in extra if c not in cns]

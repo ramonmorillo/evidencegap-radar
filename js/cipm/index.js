@@ -2,7 +2,7 @@
 // Se inicializa de forma diferida (la primera vez que se abre la pestaña) y
 // no comparte estado con EvidenceGap Radar.
 import { loadCipmData } from "./data.js";
-import { buildIndex, search, sortRecords, filterByType } from "./search.js";
+import { buildIndex, search, sortRecords, filterByType, typeOptions } from "./search.js";
 import { renderResults, renderEmpty, renderIdle } from "./render.js";
 import { esc } from "../util.js";
 
@@ -48,11 +48,10 @@ async function setup() {
   metaEl.textContent = `Base de datos local · ${state.data.records.length} registro(s)` +
     (meta.updated ? ` · actualizada ${meta.updated}` : "");
 
-  // Tipos de acuerdo presentes en los datos (no se presuponen categorías)
-  const tipos = [...new Set(state.data.records.map(r => r.tipo).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, "es"));
+  // Tipos de acuerdo presentes en los datos (texto literal; no se presuponen categorías)
   typeSel.innerHTML = `<option value="">Todos los tipos</option>` +
-    tipos.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+    typeOptions(state.data.records)
+      .map(o => `<option value="${esc(o.key)}">${esc(o.label)} (${o.count})</option>`).join("");
 
   function run() {
     state.query = input.value;

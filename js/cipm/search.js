@@ -63,8 +63,30 @@ export function sortRecords(records, order = "desc") {
   });
 }
 
-/** Filtro básico por tipo de acuerdo ("" = todos). */
-export function filterByType(records, tipo) {
-  if (!tipo) return records;
-  return records.filter(r => r.tipo === tipo);
+/**
+ * Clave de agrupación del tipo de acuerdo. "tipo" se guarda como texto literal
+ * del acuerdo; la clave solo absorbe diferencias de formato (mayúsculas,
+ * acentos, espacios, punto final), nunca de contenido.
+ */
+export function typeKey(tipo) {
+  return normalizeText(tipo).replace(/[.;:]+$/, "");
+}
+
+/** Opciones del filtro: un valor por clave, etiqueta = primera forma literal encontrada. */
+export function typeOptions(records) {
+  const groups = new Map();
+  for (const r of records) {
+    if (!r.tipo) continue;
+    const key = typeKey(r.tipo);
+    const g = groups.get(key);
+    if (g) g.count++;
+    else groups.set(key, { key, label: r.tipo, count: 1 });
+  }
+  return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label, "es"));
+}
+
+/** Filtro básico por tipo de acuerdo (clave de typeKey; "" = todos). */
+export function filterByType(records, key) {
+  if (!key) return records;
+  return records.filter(r => r.tipo && typeKey(r.tipo) === key);
 }

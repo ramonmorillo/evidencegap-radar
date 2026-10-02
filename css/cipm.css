@@ -101,7 +101,12 @@
   background: rgba(42,143,214,0.15); color: #7cc4f5; border: 1px solid rgba(42,143,214,0.35);
 }
 .cipm-result-title { margin-top: 6px; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
-.cipm-result-decision { margin-top: 4px; font-size: 13px; color: rgba(255,255,255,0.75); }
+.cipm-result-decision {
+  margin-top: 4px; font-size: 13px; color: rgba(255,255,255,0.75);
+  /* Texto literal del acuerdo: en el resumen se limita a 2 líneas; completo al desplegar */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cipm-result[open] .cipm-result-decision { display: none; }
 
 .cipm-result-body { padding: 4px 16px 16px; border-top: 1px solid var(--border); }
 .cipm-dl {

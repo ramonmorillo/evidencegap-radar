@@ -138,7 +138,9 @@ Módulo independiente para buscar apariciones de un medicamento en los acuerdos 
 }
 ```
 
-- `codigoNacional` acepta texto o lista (un medicamento puede tener varias presentaciones).
+- **Granularidad**: un registro por **medicamento y acuerdo CIPM**. Varias presentaciones del mismo medicamento en el mismo acuerdo se agrupan en `codigoNacional` (lista).
+- **Texto literal**: `tipo`, `indicacion` y `decision` se transcriben tal cual del acuerdo publicado, sin recodificar. El filtro por tipo agrupa solo variantes de formato (mayúsculas, acentos, espacios, punto final) y muestra la primera forma literal encontrada.
+- `codigoNacional` acepta texto o lista.
 - Campos ausentes → `null` (la interfaz muestra «No disponible»).
 - `url` solo se enlaza si empieza por `http(s)://`; si hay `pagina` se añade `#page=N`.
 - Registros con `demo: true` (o `meta.isDemo: true`) se marcan visiblemente como **«Datos de demostración»**.

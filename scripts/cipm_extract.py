@@ -149,7 +149,9 @@ def parse_toc(lines):
         if not started:
             continue
         if not re.search(r"\.{3,}\s*\d+$", s):
-            if toc:
+            # El índice puede continuar tras un salto de página: solo termina
+            # cuando aparece texto que no es línea de índice (inicio del cuerpo)
+            if toc and s:
                 break
             continue
         if m := BLOQUE_RE.match(s):
@@ -167,6 +169,19 @@ def norm_key(s):
     return re.sub(r"[^a-z0-9]+", " ", s).strip()
 
 
+def collapse_repeats(text):
+    """'NOVARTIS SA NOVARTIS SA NOVARTIS' → 'NOVARTIS SA' (un laboratorio repetido
+    en cada fila de la tabla). Si no es una repetición exacta, devuelve el texto."""
+    if not text:
+        return text
+    toks = text.split()
+    for p in range(1, len(toks) // 2 + 1):
+        unit = toks[:p]
+        if all(toks[i] == unit[i % p] for i in range(len(toks))):
+            return " ".join(unit)
+    return text
+
+
 def clean_name(s):
     return re.sub(r"\s+", " ", s.replace("®", "")).strip()
 
@@ -179,7 +194,10 @@ def table_column(header, word):
 def parse_table(tlines):
     """Laboratorio y CN de la tabla del expediente (sin precio)."""
     # La cabecera puede ocupar varias líneas ("MEDICAMENTO" en otra fila que "LABORATORIO")
-    header_idx = next((i for i, l in enumerate(tlines) if "LABORATORIO" in l), None)
+    # "LABORAT" también cubre cabeceras partidas ("LABORATOR / IO", CIPM 260)
+    header_idx = next((i for i, l in enumerate(tlines) if "LABORAT" in l), None)
+    if header_idx is None:  # tablas sin columna de laboratorio (p. ej. Jivi, CIPM 266)
+        header_idx = next((i for i, l in enumerate(tlines) if "MEDICAMENTO" in l), None)
     cns, lab_parts = [], []
     if header_idx is None:
         return None, cns
@@ -193,6 +211,9 @@ def parse_table(tlines):
         m = re.match(r"^(\s*)(\S.*?)(?=\s{2,}|$)", line)
         if m and med_col is not None:
             start, chunk = len(m[1]), m[2]
+            # "IO": resto de una cabecera partida ("LABORATOR / IO", CIPM 260)
+            if chunk.strip() in ("IO", "RIO", "ORIO"):
+                continue
             if start < med_col - 5 and start + len(chunk) < med_col + 2 and not re.fullmatch(r"[\d.,\s]+", chunk):
                 lab_parts.append(chunk.strip())
     lab = re.sub(r"\s+", " ", " ".join(lab_parts)).strip() or None
@@ -205,7 +226,8 @@ SECTION_RE = {
     "indicacionObjeto": re.compile(r"^Indicaci(ón|ones)( terap[ée]utica(s)?)? objeto\b[^:]*(:|$)", re.I),
     "condiciones": re.compile(r"^Condiciones de prescripci[oó]n", re.I),
     # "Con respecto a este medicamento…", "…a estos medicamentos…", "…a la presentación…"
-    "acuerdo": re.compile(r"^Con respecto a\b", re.I),
+    # (tolera erratas del original, p. ej. "Con respecto, de este medicamento" en CIPM 263)
+    "acuerdo": re.compile(r"^Con respecto\b", re.I),
 }
 
 
@@ -305,6 +327,7 @@ def parse_acuerdos(path, pages, manifest_entry):
         else:
             table, body = text[:pa_idx], text[pa_idx + 1:]
             pa_line = re.sub(r"\s+", " ", text[pa_idx].split(":", 1)[1]).strip().rstrip(".")
+            pa_line = re.sub(r"^[-–]\s*", "", pa_line)  # "- L04AC22 - Espesolimab" (CIPM 260-263)
             ATC = r"[A-Z]\d{2}(?:[A-Z]{1,2}\d{0,2})?"
             mpa = re.match(rf"^({ATC})\s*[-–]?\s*(.*)$", pa_line)
             mpb = re.match(rf"^(.*?)\s*[-–]\s*({ATC})$", pa_line)  # orden invertido: "nombre – ATC"
@@ -315,13 +338,14 @@ def parse_acuerdos(path, pages, manifest_entry):
             else:
                 atc, pa = None, pa_line
         lab, cns = parse_table(table)
+        lab = collapse_repeats(lab)
         # Tablas muy fragmentadas mezclan columnas: mejor sin dato que un dato erróneo
         if lab and (len(lab) > 80 or norm_key(e["nombre"]).split()[0] in norm_key(lab).split()):
             warnings.append(f"{e['nombre']}: laboratorio no extraíble de forma fiable (tabla fragmentada); se deja vacío")
             lab = None
         # Algunos expedientes incluyen más de una tabla (otras presentaciones)
         for k, l in enumerate(body):
-            if "LABORATORIO" in l:
+            if "LABORAT" in l:
                 end = next((j for j in range(k + 1, len(body)) if body[j].strip().startswith("Principio activo:")), len(body))
                 _, extra = parse_table(body[k:end])
                 cns += [c for c in extra if c not in cns]

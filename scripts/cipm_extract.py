@@ -131,10 +131,10 @@ def load_manifest():
 # ------------------------------------------------------------ Acuerdos CIPM
 
 ROMAN = r"[ivxl]+"
-TOC_RE = re.compile(rf"^({ROMAN})\)\s+(.+?)\s*\.{{3,}}\s*(\d+)$")
-EXP_RE = re.compile(rf"^({ROMAN})\)\s+(.+?)\s*\.{{5,}}\s*\d*$")
+TOC_RE = re.compile(rf"^({ROMAN})\)\s*(.+?)\s*\.{{3,}}\s*(\d+)$")
+EXP_RE = re.compile(rf"^({ROMAN})\)\s*(.+?)\s*\.{{5,}}\s*\d*$")
 BLOQUE_RE = re.compile(r"^([12])\)\s+(Acuerdos.*?)\s*(\.{3,}\s*\d+)?$")
-APARTADO_RE = re.compile(r"^([a-d])\)\s+([A-ZÁÉÍÓÚ][^.]*?)\s*(\.{3,}\s*\d+)?$")
+APARTADO_RE = re.compile(r"^([a-d])\)\s+([A-ZÁÉÍÓÚ][^.]*?)\.?\s*(\.{3,}\s*\d+)?$")
 
 
 def parse_toc(lines):
@@ -190,9 +190,9 @@ def parse_table(tlines):
 
 
 SECTION_RE = {
-    "indicacion": re.compile(r"^Indicaci(ón|ones) terap[ée]utica(s)? autorizada(s)?( y financiada(s)?)?\s*(:|$)", re.I),
+    "indicacion": re.compile(r"^Indicaci(ón|ones) terap[ée]utica(s)?( autorizada(s)?( y financiada(s)?)?)?\s*(:|$)", re.I),
     "indicacionFinanciada": re.compile(r"^Indicaci(ón|ones) terap[ée]utica(s)? financiada(s)?\s*(:|$)", re.I),
-    "indicacionObjeto": re.compile(r"^Indicaci(ón|ones) terap[ée]utica(s)? objeto\b[^:]*(:|$)", re.I),
+    "indicacionObjeto": re.compile(r"^Indicaci(ón|ones)( terap[ée]utica(s)?)? objeto\b[^:]*(:|$)", re.I),
     "condiciones": re.compile(r"^Condiciones de prescripci[oó]n", re.I),
     "acuerdo": re.compile(r"^Con respecto a (este|estos|esta|estas)\b", re.I),
 }
@@ -282,6 +282,12 @@ def parse_acuerdos(path, pages, manifest_entry):
             mpa = re.match(r"^([A-Z]\d{2}[A-Z]{0,2}\d{0,2})\s*[-–]?\s*(.*)$", pa_line)
             atc, pa = (mpa[1], mpa[2].strip() or None) if mpa else (None, pa_line)
         lab, cns = parse_table(table)
+        # Algunos expedientes incluyen más de una tabla (otras presentaciones)
+        for k, l in enumerate(body):
+            if "LABORATORIO" in l and "MEDICAMENTO" in l:
+                end = next((j for j in range(k + 1, len(body)) if body[j].strip().startswith("Principio activo:")), len(body))
+                _, extra = parse_table(body[k:end])
+                cns += [c for c in extra if c not in cns]
         if not cns:
             warnings.append(f"{e['nombre']}: sin código nacional en la tabla")
         sec = split_sections(body)

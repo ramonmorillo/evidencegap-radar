@@ -2,10 +2,12 @@
 
 const WORKER_BASE = "https://red-surf-9fd1.ramon-morillo-verdugo.workers.dev";
 
+// En producción (github.io o el dominio propio ramonmorillo.es) se usa el Worker;
+// solo en desarrollo local se llama a rutas relativas.
 function apiBase() {
   const host = window.location.hostname;
-  const isGitHubPages = host.endsWith("github.io");
-  return isGitHubPages ? WORKER_BASE : "";
+  const isLocal = host === "localhost" || host === "127.0.0.1" || host === "";
+  return isLocal ? "" : WORKER_BASE;
 }
 
 /**

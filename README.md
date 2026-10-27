@@ -230,3 +230,64 @@ js/
   examples.js       5 ejemplos docentes
   mesh.js           Resolución MeSH, autocomplete, query builder MeSH
 ```
+
+## Comprobación automática de novedades CIPM
+
+El workflow `.github/workflows/cipm-monitor.yml` comprueba diariamente el índice
+oficial de Sanidad a las **06:23 UTC** (07:23 en invierno y 08:23 en verano en
+España peninsular). GitHub puede retrasar las ejecuciones programadas. También
+admite ejecución manual desde **Actions → Novedades CIPM → Run workflow**.
+
+El monitor `scripts/cipm_monitor.py`:
+
+1. Descubre enlaces PDF en el índice de acuerdos y sus páginas de archivo dentro
+   del mismo directorio oficial. Si desaparecen los enlaces reconocibles, avisa;
+   no interpreta ese cambio como «sin novedades».
+2. Descarga los acuerdos nuevos y las notas recientes. Evita una importación
+   masiva del histórico: los acuerdos anteriores a la última sesión cargada y
+   las notas anteriores a la última fecha cargada no se incorporan por defecto.
+3. Guarda huellas SHA-256 en `data/cipm-monitor.json` y vuelve a comprobar las URL
+   registradas para detectar revisiones, aunque posteriormente haya sesiones más
+   recientes. No puede detectar cambios de documentos históricos que todavía
+   no estén registrados. Una nueva URL con contenido idéntico no duplica el PDF.
+4. Prepara las fuentes en un directorio temporal y ejecuta el extractor completo.
+   Solo aplica el lote al checkout si la validación termina correctamente.
+5. Ejecuta las pruebas y abre o actualiza **un único PR** desde
+   `automation/cipm-novedades`. No hace merge ni publica datos automáticamente.
+   Esa rama pertenece al workflow y se puede reemplazar al actualizar la propuesta;
+   no debe editarse manualmente.
+
+Un formato no reconocido, una discrepancia del índice o un error del proceso
+abre o actualiza la incidencia **«CIPM: actualización automática pendiente»**.
+Cuando se conoce el documento que falló, incluye su URL oficial. Tras una
+comprobación correcta, la incidencia se cierra. La primera ejecución también
+puede proponer un PR para inicializar el seguimiento y completar enlaces oficiales,
+antes de que aparezcan documentos nuevos.
+
+### Activación y avisos
+
+- Fusionar el PR de esta automatización en la rama predeterminada del repositorio.
+  Las tareas programadas solo se ejecutan desde esa rama.
+- En **Settings → Actions → General → Workflow permissions**, permitir que GitHub
+  Actions cree pull requests. El workflow declara permisos de escritura para
+  contenidos, PR e incidencias y usa el `GITHUB_TOKEN` del repositorio; no necesita
+  claves personales. Las políticas de la organización pueden limitarlo.
+- Habilitar **Issues** en el repositorio y suscribirse desde **Watch → Custom →
+  Issues / Pull requests** para recibir los avisos según las preferencias de
+  notificación de GitHub. Un fallo de permisos también queda visible en Actions.
+- Ejecutar manualmente **Novedades CIPM** una primera vez y revisar el resultado.
+  La prueba real contra Sanidad no ha podido realizarse desde el entorno de
+  desarrollo por su política de red; los tests cubren el flujo con PDF reales
+  existentes y respuestas HTTP simuladas. La URL del índice debe confirmarse en
+  esa primera ejecución; si Sanidad la cambia, puede ajustarse `INDEX` en el script.
+
+Para una comprobación local (modifica fuentes y datos si hay un lote válido):
+
+```bash
+python3 -B scripts/cipm_monitor.py --report /tmp/cipm-monitor-report.json
+```
+
+Requiere acceso HTTPS a `www.sanidad.gob.es`, Python 3 y `pdftotext`; mantiene la
+verificación TLS. No recurre a Markdown generado automáticamente ni a servicios
+externos de IA. Los límites de descarga y de recorrido del índice impiden que un
+cambio de estructura provoque una importación sin límite.

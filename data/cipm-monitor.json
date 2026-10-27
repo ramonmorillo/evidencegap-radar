@@ -1,0 +1,21 @@
+{
+  "documents": {
+    "https://www.sanidad.gob.es/areas/farmacia/precios/comisionInteministerial/acuerdosNotasInformativas/Nota_informativa_CIPM_Octubre_2026.pdf": {
+      "archivo": "Nota_informativa_CIPM_2026-10-21.pdf",
+      "sha256": "f42215463ee55acdeb52a67c2f9f789cc692c1a79462714e95cd89e8830fd392"
+    },
+    "https://www.sanidad.gob.es/areas/farmacia/precios/comisionInteministerial/acuerdosNotasInformativas/docs/Acuerdos_CIPM_271.pdf": {
+      "archivo": "Acuerdos_CIPM_271.pdf",
+      "sha256": "af5c4f57ea8567e6b685bd9ab67035ff73ba0e6d63fde9ea2dc934c6820123f3"
+    },
+    "https://www.sanidad.gob.es/areas/farmacia/precios/comisionInteministerial/acuerdosNotasInformativas/docs/Acuerdos_CIPM_272.pdf": {
+      "archivo": "Acuerdos_CIPM_272.pdf",
+      "sha256": "4f302574edf71a14a5de6165014512150aa95f9c619e64c3eae7aef7d0ccbc22"
+    },
+    "https://www.sanidad.gob.es/areas/farmacia/precios/comisionInteministerial/acuerdosNotasInformativas/docs/Acuerdos_CIPM_273.pdf": {
+      "archivo": "Acuerdos_CIPM_273.pdf",
+      "sha256": "b70922e35097f6ab3e144bf19d3b67693221a5ddbcf7862e60dfb4b62d5eaeec"
+    }
+  },
+  "version": 1
+}

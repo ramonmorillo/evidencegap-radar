@@ -2,7 +2,7 @@
 """
 CIPM Finder — extracción de registros desde los PDF oficiales de la CIPM.
 
-Lee los PDF guardados en fuentes/ y regenera data/cipm.json.
+Lee los PDF y Markdown guardados en fuentes/ y regenera data/cipm.json.
 
   * "Acuerdos CIPM <n>"            → fuente principal. Un registro por EXPEDIENTE
                                      (cada "i) Nombre®" del documento).
@@ -228,7 +228,7 @@ SECTION_RE = {
     "condiciones": re.compile(r"^Condiciones de prescripci[oó]n", re.I),
     # "Con respecto a este medicamento…", "…a estos medicamentos…", "…a la presentación…"
     # (tolera erratas del original, p. ej. "Con respecto, de este medicamento" en CIPM 263)
-    "acuerdo": re.compile(r"^Con respecto\b", re.I),
+    "acuerdo": re.compile(r"^(?:Con respecto\b|La Comisi[oó]n acuerda\b|A su vez, la Comisi[oó]n acuerda\b|Conforme a .*la Comisi[oó]n acuerda\b|Consultada la Comisi[oó]n\b)", re.I),
 }
 
 
@@ -330,6 +330,13 @@ def parse_acuerdos(path, pages, manifest_entry):
         raise ExtractionError(
             f"{path.name}: los expedientes no coinciden con el índice\n" + "\n".join(problems[:10]))
 
+    records, warnings = records_from_exps(path, cipm, fecha, exps, manifest_entry, warnings)
+    summary = {"archivo": path.name, "tipo": "acuerdos", "cipm": cipm, "fecha": fecha,
+               "paginas": len(pages), "registros": len(records), "url": (manifest_entry or {}).get("url")}
+    return records, summary, warnings
+
+
+def records_from_exps(path, cipm, fecha, exps, manifest_entry, warnings):
     url = (manifest_entry or {}).get("url")
     records = []
     bloque_n = {}
@@ -338,7 +345,13 @@ def parse_acuerdos(path, pages, manifest_entry):
         pa_idx = next((i for i, l in enumerate(text) if l.strip().startswith("Principio activo:")), None)
         if pa_idx is None:
             warnings.append(f"{e['nombre']}: sin línea 'Principio activo'")
-            table, body, atc, pa = text, [], None, None
+            if path.suffix.lower() == ".md":
+                body_at = next((i for i, l in enumerate(text)
+                                if any(rx.match(l.strip()) for rx in SECTION_RE.values())), len(text))
+                table, body = text[:body_at], text[body_at:]
+            else:
+                table, body = text, []
+            atc, pa = None, None
         else:
             table, body = text[:pa_idx], text[pa_idx + 1:]
             pa_line = re.sub(r"\s+", " ", text[pa_idx].split(":", 1)[1]).strip().rstrip(".")
@@ -353,7 +366,7 @@ def parse_acuerdos(path, pages, manifest_entry):
             else:
                 atc, pa = None, pa_line
         lab, cns = parse_table(table)
-        lab = collapse_repeats(lab)
+        lab = collapse_repeats(lab) if path.suffix.lower() == ".pdf" else None
         # Tablas muy fragmentadas mezclan columnas: mejor sin dato que un dato erróneo
         if lab and (len(lab) > 80 or norm_key(e["nombre"]).split()[0] in norm_key(lab).split()):
             warnings.append(f"{e['nombre']}: laboratorio no extraíble de forma fiable (tabla fragmentada); se deja vacío")
@@ -403,9 +416,7 @@ def parse_acuerdos(path, pages, manifest_entry):
             "archivo": f"fuentes/{path.name}",
             "url": url,
         })
-    summary = {"archivo": path.name, "tipo": "acuerdos", "cipm": cipm, "fecha": fecha,
-               "paginas": len(pages), "registros": len(records), "url": url}
-    return records, summary, warnings
+    return records, warnings
 
 
 # ------------------------------------------------------- Notas informativas
@@ -521,7 +532,8 @@ def main(argv):
     if not shutil.which("pdftotext"):
         sys.exit("ERROR: falta 'pdftotext' (paquete poppler-utils).")
     pdfs = sorted(FUENTES.glob("*.pdf"))
-    if not pdfs:
+    markdowns = sorted(FUENTES.glob("*.md"))
+    if not pdfs and not markdowns:
         sys.exit(f"ERROR: no hay PDF en {FUENTES}")
     manifest = load_manifest()
     all_records, docs, errors = [], [], []
@@ -550,12 +562,36 @@ def main(argv):
     if errors:
         sys.exit(f"\n{len(errors)} documento(s) con errores. No se escribe {OUT.relative_to(ROOT)}.")
 
+    # PDF is authoritative when both representations cover the same session.
+    sys.modules.setdefault("cipm_extract", sys.modules[__name__])
+    from cipm_markdown import parse_markdown, session_identity
+    covered = {d["cipm"]: d["fecha"] for d in docs if d["tipo"] == "acuerdos"}
+    for markdown in markdowns:
+        try:
+            cipm, fecha = session_identity(markdown.read_text(encoding="utf-8"))
+            if cipm in covered:
+                if covered[cipm] != fecha:
+                    raise ExtractionError(f"{markdown.name}: fecha incompatible con la sesión {cipm}")
+                print(f"= {markdown.name}: sesión {cipm} ya cubierta; no se duplica")
+                continue
+            recs, summ, warns = parse_markdown(markdown, manifest.get(markdown.name))
+            covered[cipm] = fecha
+            summ["avisos"] = warns
+            docs.append(summ)
+            all_records += recs
+            print(f"✓ {markdown.name}: {fecha} · {len(recs)} registros")
+        except ExtractionError as e:
+            errors.append(str(e))
+            print(f"✗ {e}", file=sys.stderr)
+    if errors:
+        sys.exit(f"{len(errors)} documento(s) con errores. No se escribe el JSON.")
+
     ids = [r["id"] for r in all_records]
     dup = {i for i in ids if ids.count(i) > 1}
     if dup:
         sys.exit(f"ERROR: identificadores duplicados: {sorted(dup)}")
 
-    all_records.sort(key=lambda r: (r["fecha"], r["cipm"] or "", -r["pagina"]), reverse=True)
+    all_records.sort(key=lambda r: (r["fecha"], r["cipm"] or "", -(r["pagina"] or 0)), reverse=True)
     docs.sort(key=lambda d: d["fecha"], reverse=True)
     out = {
         "meta": {
@@ -566,7 +602,7 @@ def main(argv):
             "generator": "scripts/cipm_extract.py",
             "granularidad": "Acuerdos CIPM: un registro por expediente (cada 'i) Nombre®' del documento). "
                             "Notas informativas: un registro por medicamento citado.",
-            "criterioTexto": "bloque, apartado, indicación y acuerdo se transcriben literalmente del PDF; "
+            "criterioTexto": "bloque, apartado, indicación y acuerdo se transcriben del documento fuente (PDF o Markdown); "
                              "solo se unen líneas y se eliminan cabeceras y pies de página.",
             "exclusiones": "No se extrae el precio.",
             "documentos": docs,

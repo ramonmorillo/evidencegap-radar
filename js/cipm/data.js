@@ -5,7 +5,7 @@
 const DATA_URL = new URL("../../data/cipm.json", import.meta.url);
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const LOCAL_PDF = /^fuentes\/[\w.\-]+\.pdf$/i;
+const LOCAL_SOURCE = /^fuentes\/[\w.\-]+\.(?:pdf|md)$/i;
 
 function str(v) {
   if (v === null || v === undefined) return null;
@@ -44,7 +44,7 @@ export function normalizeRecord(raw, i) {
     extracto: str(raw.extracto),
     truncado: raw.truncado === true,
     pagina: Number.isFinite(pagina) && pagina > 0 ? pagina : null,
-    archivo: archivo && LOCAL_PDF.test(archivo) ? archivo : null,
+    archivo: archivo && LOCAL_SOURCE.test(archivo) ? archivo : null,
     url: /^https?:\/\//i.test(str(raw.url) || "") ? str(raw.url) : null
   };
 }

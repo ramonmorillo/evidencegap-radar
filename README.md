@@ -122,7 +122,7 @@ Módulo independiente para buscar apariciones de un medicamento en los acuerdos 
 
 ### Base de datos local: `data/cipm.json`
 
-**Se genera automáticamente** con `scripts/cipm_extract.py` a partir de los PDF oficiales guardados en `fuentes/`. No se edita a mano.
+**Se genera automáticamente** con `scripts/cipm_extract.py` a partir de los PDF oficiales y las transcripciones Markdown guardadas en `fuentes/`. No se edita a mano.
 
 | Fuente | Unidad de registro | Carácter |
 |---|---|---|
@@ -146,6 +146,46 @@ Validaciones del script:
 - **Acuerdos**: los expedientes extraídos (bloque, apartado, nombre y página) deben coincidir exactamente con el **índice del propio PDF**; si no, termina con error y no escribe el JSON.
 - **Notas**: se comparan los recuentos extraídos con las cifras del primer párrafo («N nuevos medicamentos…», «N nuevas indicaciones de M medicamentos»); las discrepancias se muestran como aviso.
 - Un documento de formato no reconocido detiene la extracción (no se generan datos parciales silenciosamente).
+
+### Histórico importado desde Markdown (2020–2024)
+
+Se conservan en `fuentes/` los **69 Markdown aportados**. El generador incorpora
+**50 sesiones adicionales** y omite **19 representaciones Markdown de sesiones ya
+cubiertas por PDF**, sin duplicar expedientes. La base resultante contiene
+**2.216 registros de 71 documentos**; los 595 registros anteriores se conservan.
+La cobertura comienza el **4 de febrero de 2020** y mantiene los documentos de
+2025–2026 existentes. **No es un histórico completo**: entre las sesiones 198 y
+271 faltan las **201, 202, 204, 207 y 220** en las fuentes disponibles.
+
+- Se usa el número y la **fecha de reunión del contenido**, no la fecha del nombre
+  de archivo (que puede corresponder a su publicación). Se admite la sesión
+  extraordinaria 216.
+- `scripts/cipm_markdown.py` reconoce encabezados antiguos, tablas Markdown y
+  numeración romana con punto o paréntesis. Contrasta los expedientes con el
+  índice cuando existe y comprueba que no se pierdan líneas de principio activo.
+  Un fallo impide escribir una base parcial.
+- Los PDF tienen preferencia por sesión; una fecha contradictoria detiene la
+  importación. Los Markdown originales se conservan también cuando se omiten.
+- En los Markdown no se infieren **páginas PDF ni laboratorios** de tablas sin
+  alineación fiable. Los campos ausentes se dejan vacíos y los avisos constan en
+  `meta.documentos[].avisos`. En la sesión 215, Orkambi y Symkevi no tienen una
+  decisión individual extraíble; no se les atribuye la de otro expediente.
+- Los enlaces nuevos se identifican como **fuente Markdown aportada**, sin
+  presentarlos como PDF oficial. Las fuentes actuales no incluyen sus URL
+  oficiales; pueden añadirse en `fuentes/fuentes.json`, sin inventar enlaces.
+- La sesión extraordinaria 239 no declara un bloque de aceptación/denegación;
+  se muestra «Sin bloque en el documento» y no se clasifica como favorable.
+
+Para actualizar o validar, desde la raíz del repositorio:
+
+```bash
+python3 -B scripts/cipm_extract.py --check
+python3 -B scripts/cipm_extract.py
+python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
+```
+
+No se necesita instalar paquetes Python. `pdftotext` sigue siendo necesario para
+las fuentes PDF. La importación es local y no consulta las APIs de Radar.
 
 ### Vista «Histórico por principio activo»
 

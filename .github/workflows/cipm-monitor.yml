@@ -1,0 +1,119 @@
+name: Novedades CIPM
+
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: cipm-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BASE_BRANCH: ${{ github.event.repository.default_branch }}
+      UPDATE_BRANCH: automation/cipm-novedades
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Preparar extracción PDF
+        run: |
+          if ! command -v pdftotext >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y poppler-utils
+          fi
+
+      - name: Comprobar novedades y validar el lote
+        id: monitor
+        continue-on-error: true
+        run: python3 -B scripts/cipm_monitor.py --report /tmp/cipm-monitor-report.json
+
+      - name: Ejecutar pruebas
+        if: steps.monitor.outcome == 'success'
+        run: |
+          python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
+          git diff --check
+
+      - name: Preparar propuesta de actualización
+        if: steps.monitor.outcome == 'success'
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('/tmp/cipm-monitor-report.json').read_text())
+          lines = ['Actualización automática desde los documentos oficiales de Sanidad.', '',
+                   'El lote se ha validado con el extractor y las pruebas antes de abrir esta propuesta.', '']
+          for key, label in [('added', 'Documento nuevo'), ('revised', 'Revisión de documento')]:
+              for doc in report.get(key, []):
+                  lines.append(f"- {label}: [{doc['archivo']}]({doc['url']})")
+          if not report.get('added') and not report.get('revised'):
+              lines.append('- Inicializa o actualiza las huellas de seguimiento y los enlaces oficiales de las fuentes existentes.')
+          lines += ['', 'Revisar los textos y los avisos de extracción antes de hacer merge. '
+                    'No se realiza merge ni se publica automáticamente.']
+          Path('/tmp/cipm-auto-pr.md').write_text('\n'.join(lines) + '\n')
+          PY
+          if [ -z "$(git status --porcelain -- fuentes data/cipm.json data/cipm-monitor.json)" ]; then
+            echo 'Sin novedades: no se abre un PR.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # This branch belongs exclusively to this workflow; do not edit it manually.
+          git fetch origin "$BASE_BRANCH"
+          git fetch origin "$UPDATE_BRANCH" || true
+          git switch -C "$UPDATE_BRANCH"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add fuentes data/cipm.json data/cipm-monitor.json
+          git commit -m 'Actualiza las fuentes y los datos CIPM desde Sanidad'
+          git push --force-with-lease origin "$UPDATE_BRANCH"
+          pr=$(gh pr list --head "$UPDATE_BRANCH" --base "$BASE_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --body-file /tmp/cipm-auto-pr.md
+          else
+            gh pr create --base "$BASE_BRANCH" --head "$UPDATE_BRANCH" --title 'Actualización de documentos CIPM' --body-file /tmp/cipm-auto-pr.md
+          fi
+
+      - name: Avisar de un documento pendiente o un fallo de comprobación
+        if: failure() || steps.monitor.outcome == 'failure'
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path('/tmp/cipm-monitor-report.json')
+          report = json.loads(path.read_text()) if path.exists() else {}
+          run = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          body = ('La comprobación automática no ha podido completar la actualización. '
+                  'La base publicada no se ha modificado.\n\n'
+                  'Puede deberse a un documento nuevo no reconocido, a un cambio del índice '
+                  'o a un fallo de acceso a Sanidad. Revisar antes de incorporar datos.\n\n'
+                  f"Tipo de fallo: `{report.get('error', 'ejecución')}`.\n\n[Ver ejecución]({run})")
+          for url in report.get('documents', []):
+              body += f'\n\nDocumento pendiente de revisar: {url}'
+          Path('/tmp/cipm-issue.md').write_text(body)
+          PY
+          issue=$(gh issue list --state open --search '"CIPM: actualización automática pendiente" in:title' --json number,title --jq '.[] | select(.title == "CIPM: actualización automática pendiente") | .number' | head -n 1)
+          if [ -n "$issue" ]; then
+            gh issue edit "$issue" --body-file /tmp/cipm-issue.md
+          else
+            gh issue create --title 'CIPM: actualización automática pendiente' --body-file /tmp/cipm-issue.md
+          fi
+          exit 1
+
+      - name: Resolver el aviso después de una comprobación correcta
+        if: steps.monitor.outcome == 'success' && success()
+        run: |
+          issue=$(gh issue list --state open --search '"CIPM: actualización automática pendiente" in:title' --json number,title --jq '.[] | select(.title == "CIPM: actualización automática pendiente") | .number' | head -n 1)
+          if [ -n "$issue" ]; then
+            gh issue close "$issue" --comment 'La comprobación y validación han vuelto a completarse correctamente. Cualquier actualización de datos requiere revisar y fusionar su PR.'
+          fi

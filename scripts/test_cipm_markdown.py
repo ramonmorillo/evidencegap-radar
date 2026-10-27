@@ -86,7 +86,8 @@ Con respecto a este medicamento, la Comisión acuerda su financiación.
         result = subprocess.run([sys.executable, '-B', 'scripts/cipm_extract.py', '--check'],
                                 cwd=ROOT, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('2216 registros de 71 documento(s)', result.stdout)
+        data = json.loads(path.read_text())
+        self.assertIn(f"{len(data['records'])} registros de {len(data['meta']['documentos'])} documento(s)", result.stdout)
         self.assertEqual(hashlib.sha256(path.read_bytes()).digest(), before)
         data = json.loads(path.read_text())
         self.assertEqual(len({r['id'] for r in data['records']}), len(data['records']))

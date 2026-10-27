@@ -107,14 +107,23 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+LEGACY_HEADER = re.compile(r'ACUERDOS\s+DE\s+LA\s+REUNI[OÓ]N\s+DE\s+LA\s+COMISI[OÓ]N\s+INTERMINISTERIAL', re.I)
+
+
 def pdf_identity(path):
+    from cipm_markdown import session_identity
     pages = extractor.pdf_pages(path)
     kind = extractor.detect(pages)
     if kind == 'acuerdos':
         # Full validation is performed by the existing extractor below.
-        from cipm_markdown import session_identity
         session, date = session_identity('\n'.join(pages))
         return kind, session, date
+    if kind is None and LEGACY_HEADER.search(' '.join(pages[:2])):
+        # 2020-2022 agreements use "Acuerdos de la reunión de la Comisión...". The
+        # identity is enough to skip historical sessions; a new session with this
+        # header still has to pass the unmodified extractor during validation.
+        session, date = session_identity('\n'.join(pages))
+        return 'acuerdos', session, date
     if kind == 'nota':
         _, summary, _ = extractor.parse_nota(path, pages, None)
         return kind, None, summary['fecha']
@@ -251,7 +260,9 @@ def main():
                   'phase': getattr(error, 'phase', 'descubrimiento o comprobación'),
                   'documents': getattr(error, 'urls', [])}
         args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
-        print(report['message'], file=sys.stderr)
+        print(f"{report['message']} Fase: {report['phase']}. Tipo: {report['error']}.", file=sys.stderr)
+        for url in report['documents']:
+            print(f'Documento: {url}', file=sys.stderr)
         return 1
     args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps(report, ensure_ascii=False, indent=2))

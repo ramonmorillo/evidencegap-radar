@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import unittest
 
+import cipm_monitor
 from cipm_monitor import INDEX, PREFIX, MonitorFailure, discover, official_url, synchronize, validate
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -116,6 +117,47 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual({d['cipm'] for d in data['meta']['documentos']}, {'270', '271'})
         self.assertEqual(len(data['records']), 62)
         self.assertFalse(synchronize(root=self.root, fetch=fetch)['changed'])
+
+    def test_legacy_header_is_identified_from_real_source_text(self):
+        # Text of the official 2021 extraordinary session that blocked the first run.
+        text = (ROOT / 'fuentes/20211025_ACUERDOS_CIPM_EXTRAORDINARIA_2162.md').read_text()
+        original = cipm_monitor.extractor.pdf_pages
+        cipm_monitor.extractor.pdf_pages = lambda path: [text]
+        self.addCleanup(setattr, cipm_monitor.extractor, 'pdf_pages', original)
+        self.assertEqual(cipm_monitor.pdf_identity(Path('ignored.pdf')), ('acuerdos', '216', '2021-10-06'))
+
+    def test_all_legacy_sources_are_identifiable(self):
+        original = cipm_monitor.extractor.pdf_pages
+        self.addCleanup(setattr, cipm_monitor.extractor, 'pdf_pages', original)
+        for source in sorted((ROOT / 'fuentes').glob('*.md')):
+            text = source.read_text()
+            if not cipm_monitor.LEGACY_HEADER.search(text[:6000]):
+                continue
+            with self.subTest(source=source.name):
+                cipm_monitor.extractor.pdf_pages = lambda path, text=text: [text]
+                kind, session, _ = cipm_monitor.pdf_identity(Path('ignored.pdf'))
+                self.assertEqual(kind, 'acuerdos')
+                self.assertTrue(session.isdigit())
+
+    def test_historical_pdf_with_irregular_name_is_skipped(self):
+        old = 'https://www.sanidad.gob.es' + PREFIX + 'docs/20211025_ACUERDOS_CIPM_EXTRAORDINARIA_2162.pdf'
+        def fetch(url, limit):
+            return f'<a href="{old}">PDF</a>'.encode() if url == INDEX else self.payload
+        options = dict(root=self.root, fetch=fetch,
+                       identify=lambda path: ('acuerdos', '216', '2021-10-06'),
+                       validator=lambda staging: self.fail('historical PDF must not be validated'))
+        report = synchronize(**options)
+        self.assertEqual((report['added'], report['revised']), ([], []))
+        self.assertEqual(list((self.root / 'fuentes').glob('*.pdf')), [])
+        # The first run only initialises the monitor state; the next one is a no-op.
+        self.assertFalse(synchronize(**options)['changed'])
+
+    def test_unknown_format_is_still_reported(self):
+        original = cipm_monitor.extractor.pdf_pages
+        cipm_monitor.extractor.pdf_pages = lambda path: ['Documento sin cabecera reconocible']
+        self.addCleanup(setattr, cipm_monitor.extractor, 'pdf_pages', original)
+        with self.assertRaises(ValueError):
+            cipm_monitor.pdf_identity(Path('ignored.pdf'))
 
     def test_real_extractor_runs_in_isolation(self):
         staging = self.root / 'staging'

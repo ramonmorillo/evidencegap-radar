@@ -159,6 +159,25 @@ class MonitorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             cipm_monitor.pdf_identity(Path('ignored.pdf'))
 
+    def test_official_file_names_separate_history_from_news(self):
+        # Real names from the Sanidad index (27-oct-2026); latest imported: session 271, note 2026-09-23.
+        history = ['Acuerdos_CIPM_270-.pdf', 'ACUERDOS_CIPM_2592.pdf', '20230504_ACUERDOS_CIPM_233v2.pdf',
+                   '20211025_ACUERDOS_CIPM_EXTRAORDINARIA_2162.pdf', 'ACUERDOS_DE_LA_CIPM_1972_web.pdf',
+                   'NOTAINFORMATIVACIPM_183.pdf', 'NOTA_INFORMATIVA_DE_LA_CIPM_1882_web.pdf',
+                   'NOTAINFORMATIVACIPM_JUNIO20252.pdf', 'NOTAINFORMATIVACIPM_OCTUBRE23.pdf',
+                   'NOTAINFORMATIVACIPM_ABR23.pdf', 'NOTAINFORMATIVACIPM_MARZO2026.pdf',
+                   'Nota_CIPM_Abril_2026.pdf', 'Nota_informativa_CIPM_Julio_2026.pdf']
+        news = ['Acuerdos_CIPM_272.pdf', 'Acuerdos_CIPM_273.pdf', 'Acuerdos_CIPM_271.pdf',
+                'Nota_informativa_CIPM_Octubre_2026.pdf', 'Nota_informativa_CIPM_Septiembre_2026.pdf',
+                'Documento_sin_numero.pdf']
+        base = 'https://www.sanidad.gob.es' + PREFIX + 'docs/'
+        for name in history:
+            with self.subTest(name=name):
+                self.assertTrue(cipm_monitor.historical_by_name(base + name, 271, '2026-09-23'))
+        for name in news:
+            with self.subTest(name=name):
+                self.assertFalse(cipm_monitor.historical_by_name(base + name, 271, '2026-09-23'))
+
     def test_real_extractor_runs_in_isolation(self):
         staging = self.root / 'staging'
         (staging / 'fuentes').mkdir(parents=True)

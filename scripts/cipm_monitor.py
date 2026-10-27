@@ -144,6 +144,36 @@ def validate(staging):
         extractor.ROOT, extractor.FUENTES, extractor.MANIFEST, extractor.OUT = saved
 
 
+SESSION_IN_NAME = re.compile(r'cipm[_\s-]*(?:extraordinaria[_\s-]*)?(\d{3})\d?(?!\d)', re.I)
+MONTHS = ('ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic')
+YEAR_IN_NAME = re.compile(r'(?<=[a-z_])(20\d{2}|\d{2})\d?$', re.I)
+
+
+def historical_by_name(url, latest_session, latest_note):
+    """True when the official file name alone shows an already superseded document.
+
+    Sanidad names files inconsistently: a trailing digit is a version
+    (ACUERDOS_CIPM_2592 = session 259, v2) and monthly notes carry only the
+    month and year (NOTAINFORMATIVACIPM_JUNIO20252, ..._OCTUBRE23). A note
+    for an older session or an earlier year than the latest imported note is
+    history; anything ambiguous is downloaded and identified as before.
+    """
+    stem = unquote(urlsplit(url).path).rsplit('/', 1)[-1].rsplit('.', 1)[0]
+    number = SESSION_IN_NAME.search(stem)
+    if number:
+        return int(number[1]) < latest_session
+    if 'nota' in stem.lower():
+        year = YEAR_IN_NAME.search(stem)
+        if year:
+            value = int(year[1]) if len(year[1]) == 4 else 2000 + int(year[1])
+            lower = stem.lower().rsplit('cipm', 1)[-1]  # month names only after 'CIPM'
+            month = next((i for i, name in enumerate(MONTHS, 1) if name in lower), 0)
+            if not month:
+                return value < int(latest_note[:4])
+            return (value, month) < (int(latest_note[:4]), int(latest_note[5:7]))
+    return False
+
+
 def synchronize(root=ROOT, index=INDEX, fetch=download, identify=pdf_identity, validator=validate):
     root = Path(root)
     current = json.loads((root / 'data/cipm.json').read_text())
@@ -170,9 +200,7 @@ def synchronize(root=ROOT, index=INDEX, fetch=download, identify=pdf_identity, v
             previous = state['documents'].get(url)
             # Backfill of missing historical sessions is a separate editorial task.
             # Recheck URLs already monitored even when their session is older.
-            number = re.search(r'(?:acuerdos[_\s-]*(?:de[_\s-]*la[_\s-]*)?cipm[_\s-]*)(\d{3})(?!\d)',
-                               unquote(urlsplit(url).path), re.I)
-            if not previous and number and int(number[1]) < latest_session:
+            if not previous and historical_by_name(url, latest_session, latest_note):
                 continue
             try:
                 data = fetch(url, MAX_PDF)

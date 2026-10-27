@@ -97,7 +97,8 @@ jobs:
                   'La base publicada no se ha modificado.\n\n'
                   'Puede deberse a un documento nuevo no reconocido, a un cambio del índice '
                   'o a un fallo de acceso a Sanidad. Revisar antes de incorporar datos.\n\n'
-                  f"Tipo de fallo: `{report.get('error', 'ejecución')}`.\n\n[Ver ejecución]({run})")
+                  f"Tipo de fallo: `{report.get('error', 'ejecución')}`.\n\n"
+                  f"Fase: {report.get('phase', 'desconocida')}.\n\n[Ver ejecución]({run})")
           for url in report.get('documents', []):
               body += f'\n\nDocumento pendiente de revisar: {url}'
           Path('/tmp/cipm-issue.md').write_text(body)

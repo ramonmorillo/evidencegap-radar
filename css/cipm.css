@@ -68,6 +68,14 @@
 }
 .cipm-module button.cipm-primary:hover { box-shadow: 0 10px 24px rgba(32,196,170,0.4); }
 .cipm-meta { margin-top: 12px; font-size: 12px; color: var(--muted); }
+.cipm-meta-summary { margin: 0; line-height: 1.6; }
+.cipm-coverage { margin-top: 8px; }
+.cipm-coverage > summary { cursor: pointer; width: fit-content; color: var(--cipm-accent); }
+.cipm-coverage > summary:focus-visible { outline: 2px solid var(--cipm-accent); outline-offset: 4px; }
+.cipm-coverage ul { list-style: none; padding: 0; margin: 12px 0; }
+.cipm-coverage li { display: grid; grid-template-columns: 4em minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); line-height: 1.6; }
+.cipm-coverage strong { color: var(--text); }
+.cipm-coverage p { margin: 8px 0 0; line-height: 1.6; }
 .cipm-status { margin-top: 12px; font-size: 13px; color: var(--muted); }
 
 /* Results */

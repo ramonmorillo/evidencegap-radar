@@ -3,7 +3,7 @@
 // no comparte estado con EvidenceGap Radar.
 import { loadCipmData } from "./data.js";
 import { buildIndex, search, sortRecords, filterByType, typeOptions } from "./search.js";
-import { renderResults, renderHistory, renderEmpty, renderIdle, renderFilteredOut, coverageText } from "./render.js";
+import { renderResults, renderHistory, renderEmpty, renderIdle, renderFilteredOut, coverageText, renderCoverage, formatDate } from "./render.js";
 import { groupByActive } from "./history.js";
 import { esc } from "../util.js";
 
@@ -48,9 +48,10 @@ async function setup() {
   demoBanner.classList.toggle("hidden", !state.data.hasDemo);
   const { meta } = state.data;
   const coverage = coverageText(meta.documentos);
-  metaEl.textContent = `Base de datos local · ${state.data.records.length} registro(s)` +
-    (meta.updated ? ` · actualizada ${meta.updated}` : "") +
-    (coverage ? ` · Cobertura: ${coverage}` : "");
+  metaEl.innerHTML = `<p class="cipm-meta-summary">${esc(state.data.records.length.toLocaleString("es-ES"))} registros` +
+    (coverage ? ` · ${esc(coverage)}` : "") +
+    (meta.updated ? ` · Actualizada el ${esc(formatDate(meta.updated))}` : "") +
+    `</p>${renderCoverage(meta.documentos)}`;
 
   // Tipos de acuerdo presentes en los datos (texto literal; no se presuponen categorías)
   typeSel.innerHTML = `<option value="">Todos los tipos</option>` +

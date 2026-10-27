@@ -150,17 +150,31 @@ export function renderIdle(total) {
     <span class="cipm-idle-count">${total} registro${total !== 1 ? "s" : ""} en la base de datos local.</span></div>`;
 }
 
-/** Resumen legible de los documentos cargados (meta.documentos). */
+/** Resumen breve, también para los estados sin resultados. */
 export function coverageText(docs) {
   if (!Array.isArray(docs) || !docs.length) return "";
-  const acuerdos = docs.filter(d => d.tipo === "acuerdos");
-  const notas = docs.filter(d => d.tipo === "nota");
-  const parts = [];
-  if (acuerdos.length) {
-    parts.push(`Acuerdos CIPM ${acuerdos.map(d => `${d.cipm} (${formatDate(d.fecha)})`).join(", ")}`);
+  const dates = docs.map(d => d.fecha).filter(Boolean).sort();
+  const years = dates.length ? `${dates[0].slice(0, 4)}–${dates[dates.length - 1].slice(0, 4)}` : "";
+  return [`${docs.length} documentos`, years].filter(Boolean).join(" · ");
+}
+
+/** Cobertura agrupada por año, visible solo cuando se solicita. */
+export function renderCoverage(docs) {
+  if (!Array.isArray(docs) || !docs.length) return "";
+  const years = new Map();
+  for (const doc of docs) {
+    const year = doc.fecha?.slice(0, 4) || "Sin fecha";
+    if (!years.has(year)) years.set(year, []);
+    years.get(year).push(doc);
   }
-  if (notas.length) {
-    parts.push(`notas informativas de ${notas.map(d => formatDate(d.fecha)).join(", ")}`);
-  }
-  return parts.join("; ");
+  const rows = [...years.entries()].sort(([a], [b]) => b.localeCompare(a)).map(([year, entries]) => {
+    const sessions = entries.filter(d => d.tipo === "acuerdos").map(d => d.cipm)
+      .sort((a, b) => String(a).localeCompare(String(b), "es", { numeric: true }));
+    const notes = entries.filter(d => d.tipo === "nota").map(d => formatDate(d.fecha));
+    const text = [sessions.length ? `Sesiones ${sessions.join(", ")}` : "",
+      notes.length ? `Notas informativas: ${notes.join(", ")}` : ""].filter(Boolean).join(". ");
+    return `<li><strong>${esc(year)}</strong><span>${esc(text)}</span></li>`;
+  }).join("");
+  return `<details class="cipm-coverage"><summary>Ver cobertura documental</summary>
+    <ul>${rows}</ul><p>La cobertura se limita a los documentos incorporados; no representa un histórico completo.</p></details>`;
 }

@@ -29,7 +29,8 @@ function sourceLabel(r) {
 }
 
 function docLink(r) {
-  const page = r.pagina ? `#page=${r.pagina}` : "";
+  const markdown = /\.md$/i.test(r.archivo || "");
+  const page = !markdown && r.pagina ? `#page=${r.pagina}` : "";
   const pTxt = r.pagina ? ` (p. ${r.pagina})` : "";
   // #page=N lo interpretan la mayoría de visores PDF de navegador
   if (r.url) {
@@ -39,8 +40,8 @@ function docLink(r) {
     return `<a href="${esc(r.url + page)}" target="_blank" rel="noopener noreferrer">Abrir documento oficial${pTxt}</a>${local}`;
   }
   if (r.archivo) {
-    return `<a href="${esc(r.archivo + page)}" target="_blank" rel="noopener">Abrir PDF${pTxt}</a>
-      <small class="cipm-muted"> · copia local del documento publicado por el Ministerio</small>`;
+    return `<a href="${esc(r.archivo + page)}" target="_blank" rel="noopener">${markdown ? "Abrir fuente Markdown" : "Abrir PDF"}${pTxt}</a>
+      <small class="cipm-muted"> · ${markdown ? "transcripción aportada en Markdown; cotejar con el documento oficial" : "copia local del documento publicado por el Ministerio"}</small>`;
   }
   return r.demo
     ? `<span class="cipm-na">Sin documento (registro de demostración)</span>`
@@ -85,14 +86,14 @@ export function resultCard(r) {
         <dt>Código nacional</dt><dd>${cn ? cn : NA}</dd>
         <dt>Prescripción y dispensación</dt><dd>${val(r.condiciones)}</dd>
         <dt>Página</dt><dd>${r.pagina ? esc(r.pagina) : NA}</dd>
-        <dt>PDF</dt><dd>${docLink(r)}</dd>
+        <dt>Fuente</dt><dd>${docLink(r)}</dd>
       </dl>
       ${textBlock("Acuerdo (texto literal)", r.acuerdo)}
       ${textBlock("Indicación objeto del expediente", r.indicacionObjeto)}
       ${textBlock(r.fuente === "nota" ? "Indicación" : "Indicación terapéutica autorizada", r.indicacion)}
       ${textBlock("Indicación terapéutica financiada", r.indicacionFinanciada)}
       ${textBlock("Extracto", r.extracto)}
-      ${r.truncado ? `<p class="cipm-muted cipm-trunc">Algún texto se ha recortado por su extensión ([…]). Consulta el PDF para el texto completo.</p>` : ""}
+      ${r.truncado ? `<p class="cipm-muted cipm-trunc">Algún texto se ha recortado por su extensión ([…]). Consulta el documento fuente para el texto completo.</p>` : ""}
     </div>
   </details>`;
 }

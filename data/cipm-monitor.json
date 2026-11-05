@@ -15,6 +15,10 @@
     "https://www.sanidad.gob.es/areas/farmacia/precios/comisionInteministerial/acuerdosNotasInformativas/docs/Acuerdos_CIPM_273.pdf": {
       "archivo": "Acuerdos_CIPM_273.pdf",
       "sha256": "b70922e35097f6ab3e144bf19d3b67693221a5ddbcf7862e60dfb4b62d5eaeec"
+    },
+    "https://www.sanidad.gob.es/areas/farmacia/precios/comisionInteministerial/acuerdosNotasInformativas/docs/Acuerdos_CIPM_274_.pdf": {
+      "archivo": "Acuerdos_CIPM_274.pdf",
+      "sha256": "311b8252d40a356085423446b4a020f6df20f2769b70b7b6cdc45b260f5b742b"
     }
   },
   "version": 1
